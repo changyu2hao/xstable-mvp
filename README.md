@@ -1,44 +1,172 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+XStable Payroll (MVP)
 
-## Getting Started
+XStable Payroll is an MVP payroll system designed to explore secure, server-first payroll workflows using Next.js App Router + Supabase, with a future path toward USDC / on-chain payroll.
 
-First, run the development server:
+This repository represents the project up to Phase 2 (Security & Employee Payslip).
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+🚀 Tech Stack
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Frontend / App
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Next.js (App Router)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+React (Client & Server Components)
 
-## Learn More
+TypeScript
 
-To learn more about Next.js, take a look at the following resources:
+Tailwind CSS
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Backend / Infra
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Supabase (Auth, Postgres, RLS)
 
-## Deploy on Vercel
+Supabase SSR (@supabase/ssr)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Row Level Security (RLS)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Documents
 
-## Environment variables
+pdf-lib (server-only PDF generation)
 
-Create a `.env.local` file in the project root:
+🎯 Project Goals
 
-```env
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url_here
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key_here
+Build a realistic payroll MVP, not just a demo UI
+
+Enforce strict permission boundaries (owner vs employee)
+
+Ensure all sensitive operations are server-only
+
+Prepare for future on-chain payroll integration
+
+📦 Core Features (Current)
+✅ Authentication
+
+Email/password login & logout
+
+Persistent sessions via Supabase Auth
+
+Secure SSR-compatible auth handling
+
+✅ Company & Employee Model
+
+Companies with explicit owner_user_id
+
+Employees belong to a company
+
+Employee claim flow via invite token
+
+Claim implemented using RPC (security definer) for RLS safety
+
+✅ Payroll System
+
+Payroll batches & payroll items
+
+Status lifecycle: pending | paid | failed
+
+Strong DB constraints (e.g. paid_at required when status = paid)
+
+✅ Employee Portal
+
+/me/payroll — employee payroll list
+
+/me/payroll/[id] — payslip detail page
+
+Employee can only access their own payroll items
+
+✅ Server-only Payslip PDF
+
+Secure API route: /api/me/payroll/[id]/pdf
+
+Server-side authentication & ownership validation
+
+Binary PDF generation using pdf-lib
+
+No client-side data trust
+
+✅ Security (Phase 2)
+
+Row Level Security (RLS) enabled on:
+
+companies
+
+employees
+
+payroll_batches
+
+payroll_items
+
+Policies enforce:
+
+Company owners can only manage their own data
+
+Employees can only read their own records
+
+Client-side Supabase access is non-authoritative
+
+Critical mutations designed for server-only or RPC
+
+🗂️ Project Structure (Simplified)
+app/
+  company/                # Company dashboard (client-rendered)
+  me/
+    payroll/              # Employee payroll pages
+  api/
+    me/payroll/[id]/pdf/  # Server-only PDF export
+
+components/
+  LogoutButton.tsx
+
+lib/
+  supabase/
+    browser.ts            # createSupabaseBrowserClient
+    server.ts             # createServerClient (SSR / routes)
+
+middleware.ts             # Auth/session propagation
+
+🧠 Architectural Decisions
+
+App Router default = Server Components
+
+Client Components used only when session-dependent
+
+No sensitive logic trusted to the browser
+
+RLS as the final authority for data access
+
+RPC used where RLS + tokens are required (employee claim)
+
+🛣️ Roadmap
+Phase 2 (In Progress / Partially Complete)
+
+ Employee payslip portal
+
+ Server-only PDF export
+
+ RLS policies
+
+ Move admin payroll mutations fully server-only
+
+ Add server APIs for payroll management
+
+Phase 3 (Planned)
+
+USDC / on-chain payroll integration
+
+Transaction hash → blockchain explorer
+
+Admin audit logs
+
+Multi-company / multi-admin support
+
+⚠️ Notes
+
+This repository is an MVP / learning project
+
+Not production-ready
+
+Focused on correct architecture & security boundaries, not polish
+
+👤 Author
+
+Built by Changyu Huang
+Exploring secure payroll systems, Web3-ready architecture, and real-world full-stack patterns.
