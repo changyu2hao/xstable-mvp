@@ -1,8 +1,10 @@
 // app/company-detail/EmployeeCreateForm.tsx
 'use client';
 
-import { FormEvent, useState } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { FormEvent, useState, useEffect } from 'react';
+import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
+const supabase = createSupabaseBrowserClient();
+
 
 interface EmployeeCreateFormProps {
   companyId: string;
@@ -16,8 +18,19 @@ export default function EmployeeCreateForm({
   const [walletAddress, setWalletAddress] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false); // 可选，用来显示 Copied!
+
+  useEffect(() => {
+  supabase.auth.getUser().then(({ data }) => {
+    console.log("current user:", data.user?.id, data.user?.email);
+  });
+}, []);
+
 
   async function handleSubmit(e: FormEvent) {
+    setInviteLink(null);
+    setCopied(false);
     e.preventDefault();
     setErrorMsg(null);
 
@@ -61,16 +74,22 @@ export default function EmployeeCreateForm({
     }
 
     // 2️⃣ 再真正插入
-    const { error } = await supabase.from('employees').insert({
-      company_id: companyId,
-      name: trimmedName,
-      email: email.trim() || null,
-      wallet_address: normalizedWallet, // 注意这里用 normalizedWallet
-    });
+    const { data: inserted, error } = await supabase
+      .from('employees')
+      .insert({
+        company_id: companyId,
+        name: trimmedName,
+        email: email.trim() || null,
+        wallet_address: normalizedWallet,
+      })
+      .select('id')
+      .single();
+
+
 
     setLoading(false);
 
-    if (error) {
+    if (error || !inserted) {
       console.error('Error inserting employee:', error);
 
       // 如果数据库开了唯一约束，重复会报 23505
@@ -84,6 +103,35 @@ export default function EmployeeCreateForm({
       return;
     }
 
+    // 3️⃣ generate invite token + expires
+    const token = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    // 4️⃣ write token back to employees
+    const { data: updated, error: inviteErr } = await supabase
+      .from('employees')
+      .update({
+        invite_token: token,
+        invite_expires_at: expiresAt,
+      })
+      .eq('id', inserted.id)
+      .select('id, invite_token')
+      .single();
+
+    console.log('invite update:', { updated, inviteErr, insertedId: inserted.id, token });
+
+
+    if (inviteErr) {
+      console.error('Error generating invite token:', inviteErr);
+      setErrorMsg(`Employee created, but failed to generate invite link: ${inviteErr.message}`);
+      setLoading(false);
+      return;
+    }
+
+    // 5️⃣ build link + store in state
+    const link = `${window.location.origin}/claim?token=${token}`;
+    setInviteLink(link);
+    setCopied(false);
 
     // ✅ 成功后清空表单
     setName('');
@@ -91,7 +139,7 @@ export default function EmployeeCreateForm({
     setWalletAddress('');
 
     // ✅ 简单粗暴刷新，保证员工列表立刻更新
-    window.location.reload();
+    // window.location.reload();
   }
 
   return (
@@ -99,7 +147,7 @@ export default function EmployeeCreateForm({
       onSubmit={handleSubmit}
       className="space-y-4 rounded border border-slate-700 bg-slate-900 p-4"
     >
-      <h2 className="text-lg font-semibold">Add employee</h2>
+      <h2 className="text-lg font-semibold text-white">Add employee</h2>
 
       {/* 员工姓名 */}
       <div className="space-y-1">
@@ -151,6 +199,32 @@ export default function EmployeeCreateForm({
       >
         {loading ? 'Creating...' : 'Add employee'}
       </button>
+      {/* ✅ Invite link 展示 + Copy */}
+      {inviteLink && (
+        <div className="space-y-2 rounded-lg border border-slate-700 bg-slate-950 p-3">
+          <p className="text-sm text-slate-300">Invite link (expires in 7 days)</p>
+
+          <div className="flex items-center gap-2">
+            <input
+              readOnly
+              value={inviteLink}
+              className="flex-1 rounded border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-100"
+            />
+
+            <button
+              type="button"
+              onClick={async () => {
+                await navigator.clipboard.writeText(inviteLink);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1500);
+              }}
+              className="rounded bg-indigo-600 px-3 py-2 text-xs font-medium text-white hover:bg-indigo-500"
+            >
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+          </div>
+        </div>
+      )}
     </form>
   );
 }

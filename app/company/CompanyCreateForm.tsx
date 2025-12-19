@@ -3,7 +3,9 @@
 
 import { useState, useTransition, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabaseClient';
+import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
+
+const supabase = createSupabaseBrowserClient();
 
 export default function CompanyCreateForm() {
   const [name, setName] = useState('');
@@ -12,7 +14,7 @@ export default function CompanyCreateForm() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const router = useRouter();
 
-    async function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setErrorMsg(null);
 
@@ -23,20 +25,28 @@ export default function CompanyCreateForm() {
       setErrorMsg('Company name is required');
       return;
     }
+    // ✅ 必须已登录（RLS 需要 auth.uid()）
+    const { data: userData, error: userErr } = await supabase.auth.getUser();
+    const user = userData.user;
 
-    const { error } = await supabase.from('companies').insert({
+    if (userErr || !user) {
+      setErrorMsg("You must be logged in to create a company.");
+      return;
+    }
+
+    const { error } = await supabase.from("companies").insert({
       name: trimmedName,
-      owner_email: trimmedEmail || null,
+      owner_email: trimmedEmail || user.email || null,
+      owner_user_id: user.id, // ⭐关键
     });
 
     if (error) {
-      console.error('Error inserting company:', error);
+      console.error("Error inserting company:", error);
 
-      // 如果是唯一约束冲突（重复公司名）
-      // Supabase 基于 Postgres，一般 code 是 '23505'
-      // （如果 TS 报错可以把 error 类型临时用 any）
-      if (error.code === '23505') {
-        setErrorMsg('A company with this name already exists.');
+      if (error.code === "23505") {
+        setErrorMsg("A company with this name already exists.");
+      } else if (error.code === "42501") {
+        setErrorMsg("Blocked by RLS. (owner_user_id must match your account)");
       } else {
         setErrorMsg(error.message);
       }

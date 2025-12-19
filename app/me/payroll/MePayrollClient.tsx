@@ -1,0 +1,214 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
+const supabase = createSupabaseBrowserClient();
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import LogoutButton from "@/components/LogoutButton";
+
+
+type Employee = {
+    id: string;
+    name: string | null;
+    email: string | null;
+    wallet_address: string | null;
+};
+
+type PayrollItem = {
+    id: string;
+    employee_id: string;
+    amount_usdc: string; // ⚠️ Supabase numeric → string
+    status: "pending" | "paid" | "failed";
+    created_at: string;
+    paid_at: string | null;
+    tx_hash: string | null;
+};
+
+function StatusBadge({ status }: { status: "pending" | "paid" | "failed" }) {
+    const map = {
+        pending: "bg-yellow-500/15 text-yellow-400 border-yellow-500/30",
+        paid: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+        failed: "bg-rose-500/15 text-rose-400 border-rose-500/30",
+    };
+
+    return (
+        <span
+            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${map[status]}`}
+        >
+            {status.toUpperCase()}
+        </span>
+    );
+}
+
+export default function MePayrollClient() {
+    const [loading, setLoading] = useState(true);
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
+    const [copiedTxId, setCopiedTxId] = useState<string | null>(null);
+    const [employee, setEmployee] = useState<Employee | null>(null);
+    const [items, setItems] = useState<PayrollItem[]>([]);
+    const router = useRouter();
+
+
+    const displayName = useMemo(() => {
+        return employee?.name || employee?.email || "Employee";
+    }, [employee]);
+
+    useEffect(() => {
+        async function run() {
+            setLoading(true);
+            setErrorMsg(null);
+
+            // 1) get current auth user
+            const { data: authData, error: authErr } = await supabase.auth.getUser();
+
+            // ✅ 统一把“session missing / not logged in”当成未登录处理
+            if (authErr || !authData.user) {
+                router.replace(`/login?next=/me/payroll`);
+                return;
+            }
+
+            // 2) find my employee record by user_id
+            const { data: emp, error: empErr } = await supabase
+                .from("employees")
+                .select("id, name, email, wallet_address")
+                .eq("user_id", authData.user.id)
+                .maybeSingle();
+
+            if (empErr) {
+                setErrorMsg(`Failed to load employee profile: ${empErr.message}`);
+                setLoading(false);
+                return;
+            }
+            if (!emp) {
+                setErrorMsg("No employee profile linked to this account. (Claim may be missing.)");
+                setLoading(false);
+                return;
+            }
+            setEmployee(emp);
+
+            // 3) load payroll items for this employee
+            const { data: payrollItems, error: itemsErr } = await supabase
+                .from("payroll_items")
+                .select(`
+                    id,
+                    employee_id,
+                    amount_usdc,
+                    status,
+                    created_at,
+                    paid_at,
+                    tx_hash
+                `)
+                .eq("employee_id", emp.id)
+                .order("created_at", { ascending: false });
+
+            if (itemsErr) {
+                setErrorMsg(`Failed to load payroll items: ${itemsErr.message}`);
+                setLoading(false);
+                return;
+            }
+            setItems(payrollItems ?? []);
+            setLoading(false);
+        }
+
+        run();
+    }, []);
+
+    return (
+        <div className="min-h-screen bg-slate-950 px-4 py-8 text-slate-100">
+            <div className="mx-auto w-full max-w-3xl space-y-4">
+                <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+                    <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                            <h1 className="text-2xl font-semibold">My Payroll</h1>
+                            <p className="mt-1 text-sm text-slate-300">
+                                Signed in as: <span className="text-slate-100">{displayName}</span>
+                            </p>
+                            {employee?.wallet_address ? (
+                                <p className="mt-1 text-xs text-slate-400 break-all">
+                                    Wallet: {employee.wallet_address}
+                                </p>
+                            ) : null}
+                        </div>
+
+                        <div className="shrink-0">
+                            <LogoutButton />
+                        </div>
+                    </div>
+                </div>
+                {loading ? (
+                    <div className="rounded-xl border border-slate-800 bg-slate-900 p-5 text-slate-300">
+                        Loading…
+                    </div>
+                ) : errorMsg ? (
+                    <div className="rounded-xl border border-rose-900/60 bg-rose-950/40 p-5 text-rose-200">
+                        {errorMsg}
+                    </div>
+                ) : (
+                    <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
+                        <div className="border-b border-slate-800 px-5 py-3 text-sm text-slate-300">
+                            {items.length} item(s)
+                        </div>
+
+                        {items.length === 0 ? (
+                            <div className="px-5 py-6 text-sm text-slate-300">
+                                No payroll items yet.
+                            </div>
+                        ) : (
+                            <div className="divide-y divide-slate-800">
+                                {items.map((it) => (
+                                    <div key={it.id} className="px-5 py-4">
+                                        <div className="flex items-start justify-between gap-4">
+                                            <div className="min-w-0">
+                                                <Link
+                                                    href={`/me/payroll/${it.id}`}
+                                                    className="text-sm text-slate-200 hover:underline"
+                                                >
+                                                    Payroll payment
+                                                </Link>
+                                                <p className="mt-1 text-xs text-slate-400">
+                                                    Created at {it.created_at ? new Date(it.created_at).toLocaleString() : "—"}
+                                                    {" · "}
+                                                    <StatusBadge status={it.status} />
+                                                </p>
+                                                {it.tx_hash ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={async () => {
+                                                            await navigator.clipboard.writeText(it.tx_hash!);
+                                                            setCopiedTxId(it.id);
+                                                            setTimeout(() => setCopiedTxId(null), 1200);
+                                                        }}
+                                                        className="mt-1 block text-xs text-slate-400 hover:text-slate-200"
+                                                        title="Click to copy transaction hash"
+                                                    >
+                                                        {copiedTxId === it.id ? (
+                                                            <span className="text-emerald-400">Copied!</span>
+                                                        ) : (
+                                                            <>Tx: {it.tx_hash.slice(0, 8)}…{it.tx_hash.slice(-6)}</>
+                                                        )}
+                                                    </button>
+                                                ) : null}
+                                            </div>
+                                            <div className="shrink-0 text-right">
+                                                <p className="text-sm font-semibold">
+                                                    {it.amount_usdc != null ? Number(it.amount_usdc).toFixed(2) : "—"}
+                                                </p>
+
+                                                {it.paid_at ? (
+                                                    <p className="mt-1 text-xs text-slate-400">
+                                                        Paid at {new Date(it.paid_at).toLocaleString()}
+                                                    </p>
+                                                ) : null}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
