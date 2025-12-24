@@ -2,9 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
-
-const supabase = createSupabaseBrowserClient();
 
 export default function ClaimClient({ token }: { token: string }) {
   const router = useRouter();
@@ -20,27 +17,27 @@ export default function ClaimClient({ token }: { token: string }) {
           return;
         }
 
-        // 1) must be logged in
-        const { data: authData, error: authErr } = await supabase.auth.getUser();
-        const user = authData.user;
+        setMsg("Claiming your employee profile…");
 
-        if (authErr || !user) {
+        const res = await fetch("/api/me/claim", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token }),
+        });
+
+        const text = await res.text();
+        const json = text ? JSON.parse(text) : null;
+
+        if (cancelled) return;
+
+        if (res.status === 401) {
           router.replace(`/login?next=/claim?token=${encodeURIComponent(token)}`);
           return;
         }
 
-        if (cancelled) return;
-        setMsg("Claiming your employee profile…");
-
-        // 2) claim via RPC (server-side, atomic, RLS-friendly)
-        const { data, error } = await supabase.rpc("claim_employee", {
-          p_token: token,
-        });
-
-        if (cancelled) return;
-
-        if (error) {
-          const m = (error.message || "").toLowerCase();
+        if (!res.ok) {
+          const m = String(json?.error ?? `Claim failed (${res.status})`).toLowerCase();
 
           if (m.includes("already claimed")) {
             setMsg("This account is already linked to an employee. Redirecting…");
@@ -48,21 +45,15 @@ export default function ClaimClient({ token }: { token: string }) {
             return;
           }
 
-          if (m.includes("invalid or expired token")) {
+          if (m.includes("invalid") || m.includes("expired")) {
             setMsg("Invite link is invalid or expired. Please request a new invite.");
             return;
           }
 
-          if (m.includes("not authenticated")) {
-            router.replace(`/login?next=/claim?token=${encodeURIComponent(token)}`);
-            return;
-          }
-
-          setMsg(`Claim failed: ${error.message}`);
+          setMsg(`Claim failed: ${json?.error ?? `(${res.status})`}`);
           return;
         }
 
-        // data is the employees row (returned by RPC) - optional to use
         setMsg("Claim successful! Redirecting…");
         setTimeout(() => router.replace("/me/payroll"), 1200);
       } catch (e: any) {
@@ -71,7 +62,6 @@ export default function ClaimClient({ token }: { token: string }) {
     }
 
     run();
-
     return () => {
       cancelled = true;
     };

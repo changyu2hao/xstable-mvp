@@ -8,7 +8,7 @@ const supabase = createSupabaseBrowserClient();
 export default function LoginClient() {
   const router = useRouter();
   const sp = useSearchParams();
-  const next = sp.get("next") || "/";
+  const next = sp.get("next") || "/company";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

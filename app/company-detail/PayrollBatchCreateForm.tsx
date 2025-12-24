@@ -1,18 +1,17 @@
 // app/company-detail/PayrollBatchCreateForm.tsx
-'use client';
+"use client";
 
-import { FormEvent, useState } from 'react';
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
-const supabase = createSupabaseBrowserClient();
+import { FormEvent, useState } from "react";
 
 interface Props {
   companyId: string;
+  onCreated?: () => void | Promise<void>;
 }
 
-export default function PayrollBatchCreateForm({ companyId }: Props) {
-  const [title, setTitle] = useState('');
-  const [payDate, setPayDate] = useState('');
-  const [note, setNote] = useState('');
+export default function PayrollBatchCreateForm({ companyId, onCreated }: Props) {
+  const [title, setTitle] = useState("");
+  const [payDate, setPayDate] = useState("");
+  const [note, setNote] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -21,39 +20,51 @@ export default function PayrollBatchCreateForm({ companyId }: Props) {
     setErrorMsg(null);
 
     const trimmedTitle = title.trim();
+    const trimmedNote = note.trim();
+
     if (!trimmedTitle) {
-      setErrorMsg('Title is required');
+      setErrorMsg("Title is required");
       return;
     }
     if (!payDate) {
-      setErrorMsg('Pay date is required');
+      setErrorMsg("Pay date is required");
       return;
     }
 
     setLoading(true);
+    try {
+      const res = await fetch("/api/admin/payroll-batches", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyId,
+          title: trimmedTitle,
+          payDate, // yyyy-mm-dd
+          note: trimmedNote || null,
+        }),
+      });
 
-    const { error } = await supabase.from('payroll_batches').insert({
-      company_id: companyId,
-      title: trimmedTitle,
-      pay_date: payDate,     // yyyy-mm-dd
-      note: note.trim() || null,
-      // status 让它用默认的 draft
-    });
+      const text = await res.text();
+      const json = text ? JSON.parse(text) : null;
 
-    setLoading(false);
+      if (!res.ok) {
+        setErrorMsg(json?.error ?? `Failed to create batch (${res.status})`);
+        return;
+      }
 
-    if (error) {
-      console.error('Error creating payroll batch:', error);
-      setErrorMsg(error.message);
-      return;
+      // success
+      setTitle("");
+      setPayDate("");
+      setNote("");
+
+      await onCreated?.();
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg(err?.message ?? "Failed to create batch");
+    } finally {
+      setLoading(false);
     }
-
-    setTitle('');
-    setPayDate('');
-    setNote('');
-
-    // 简单粗暴：刷新页面，让批次列表更新
-    window.location.reload();
   }
 
   return (
@@ -98,16 +109,14 @@ export default function PayrollBatchCreateForm({ companyId }: Props) {
         />
       </div>
 
-      {errorMsg && (
-        <p className="text-sm text-red-400">Error: {errorMsg}</p>
-      )}
+      {errorMsg && <p className="text-sm text-red-400">Error: {errorMsg}</p>}
 
       <button
         type="submit"
         disabled={loading}
         className="rounded bg-emerald-500 px-4 py-2 text-sm font-medium text-slate-950 disabled:opacity-60"
       >
-        {loading ? 'Creating...' : 'Create batch'}
+        {loading ? "Creating..." : "Create batch"}
       </button>
     </form>
   );

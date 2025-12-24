@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
-const supabase = createSupabaseBrowserClient();
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import LogoutButton from "@/components/LogoutButton";
@@ -58,61 +56,39 @@ export default function MePayrollClient() {
         async function run() {
             setLoading(true);
             setErrorMsg(null);
+            try {
+                const res = await fetch("/api/me/payroll", {
+                    method: "GET",
+                    credentials: "include",
+                    cache: "no-store",
+                });
 
-            // 1) get current auth user
-            const { data: authData, error: authErr } = await supabase.auth.getUser();
+                const text = await res.text();
+                const json = text ? JSON.parse(text) : null;
 
-            // ✅ 统一把“session missing / not logged in”当成未登录处理
-            if (authErr || !authData.user) {
-                router.replace(`/login?next=/me/payroll`);
-                return;
-            }
+                // 未登录：跳 login
+                if (res.status === 401) {
+                    router.replace(`/login?next=/me/payroll`);
+                    return;
+                }
 
-            // 2) find my employee record by user_id
-            const { data: emp, error: empErr } = await supabase
-                .from("employees")
-                .select("id, name, email, wallet_address")
-                .eq("user_id", authData.user.id)
-                .maybeSingle();
+                if (!res.ok) {
+                    throw new Error(json?.error ?? `Failed (${res.status})`);
+                }
 
-            if (empErr) {
-                setErrorMsg(`Failed to load employee profile: ${empErr.message}`);
+                setEmployee(json.employee ?? null);
+                setItems(json.items ?? []);
+            } catch (e: any) {
+                console.error(e);
+                setErrorMsg(e?.message ?? "Failed to load payroll");
+            } finally {
                 setLoading(false);
-                return;
             }
-            if (!emp) {
-                setErrorMsg("No employee profile linked to this account. (Claim may be missing.)");
-                setLoading(false);
-                return;
-            }
-            setEmployee(emp);
-
-            // 3) load payroll items for this employee
-            const { data: payrollItems, error: itemsErr } = await supabase
-                .from("payroll_items")
-                .select(`
-                    id,
-                    employee_id,
-                    amount_usdc,
-                    status,
-                    created_at,
-                    paid_at,
-                    tx_hash
-                `)
-                .eq("employee_id", emp.id)
-                .order("created_at", { ascending: false });
-
-            if (itemsErr) {
-                setErrorMsg(`Failed to load payroll items: ${itemsErr.message}`);
-                setLoading(false);
-                return;
-            }
-            setItems(payrollItems ?? []);
-            setLoading(false);
         }
 
         run();
-    }, []);
+    }, [router]);
+
 
     return (
         <div className="min-h-screen bg-slate-950 px-4 py-8 text-slate-100">

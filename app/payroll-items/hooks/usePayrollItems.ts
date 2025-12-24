@@ -1,14 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { Employee, PayrollItem } from '../types';
 
 type Args = {
   batchId: string;
   companyId: string | null;
 };
-const supabase = createSupabaseBrowserClient();
 
 export default function usePayrollItems({ batchId, companyId }: Args) {
   const [items, setItems] = useState<PayrollItem[]>([]);
@@ -26,49 +24,25 @@ export default function usePayrollItems({ batchId, companyId }: Args) {
     setError(null);
 
     try {
-      const { data: itemData, error: itemErr } = await supabase
-        .from('payroll_items')
-        .select(
-          `
-          id,
-          amount_usdc,
-          status,
-          tx_hash,
-          created_at,
-          employees (
-            id,
-            name,
-            wallet_address
-          )
-        `
-        )
-        .eq('batch_id', batchId)
-        .order('created_at', { ascending: true });
+      // 1) server-only items
+      const res = await fetch(`/api/admin/payroll-items?batchId=${batchId}`, {
+        method: "GET",
+        credentials: "include",
+      });
 
-      if (itemErr) throw new Error(itemErr.message);
-
-      setItems(((itemData ?? []) as unknown) as PayrollItem[]);
-
-      if (companyId) {
-        const { data: empData, error: empErr } = await supabase
-          .from('employees')
-          .select('id, name, wallet_address')
-          .eq('company_id', companyId)
-          .order('created_at', { ascending: true });
-
-        if (empErr) throw new Error(empErr.message);
-
-        setEmployees((empData ?? []) as Employee[]);
-      } else {
-        setEmployees([]);
-      }
+      // 2) employees list (for dropdown)
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Failed to load payroll items");
+      setItems(json.items ?? []);
+      setEmployees(json.employees ?? []); // ⭐关键
     } catch (e: any) {
       console.error(e);
-      setError(e?.message ?? 'Failed to load payroll items');
+      setError(e?.message ?? "Failed to load payroll items");
     } finally {
       setLoading(false);
     }
-  }, [batchId, companyId]);
+  }, [batchId]);
+
 
   useEffect(() => {
     fetchData();
@@ -78,19 +52,28 @@ export default function usePayrollItems({ batchId, companyId }: Args) {
     async (employeeId: string, amountNumber: number) => {
       setCreating(true);
       setError(null);
+
       try {
-        const { error: insertErr } = await supabase.from('payroll_items').insert({
-          batch_id: batchId,
-          employee_id: employeeId,
-          amount_usdc: amountNumber,
+        const res = await fetch("/api/admin/payroll-items", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            batchId,
+            employeeId,
+            amountUsdc: amountNumber,
+          }),
         });
 
-        if (insertErr) throw new Error(insertErr.message);
+        const json = await res.json();
+        if (!res.ok) {
+          throw new Error(json?.error ?? "Failed to create payroll item");
+        }
 
         await fetchData();
       } catch (e: any) {
         console.error(e);
-        setError(e?.message ?? 'Failed to create payroll item');
+        setError(e?.message ?? "Failed to create payroll item");
         throw e;
       } finally {
         setCreating(false);
@@ -105,21 +88,20 @@ export default function usePayrollItems({ batchId, companyId }: Args) {
       setError(null);
 
       try {
-        const { error: updateErr } = await supabase
-          .from('payroll_items')
-          .update({
-            status: 'paid',
-            paid_at: new Date().toISOString(), // ✅ 关键
-            tx_hash: '0xFAKE_TX_' + crypto.randomUUID().replace(/-/g, ''),
-          })
-          .eq('id', itemId);
+        const res = await fetch(`/api/admin/payroll-items/${encodeURIComponent(itemId)}/mark-paid`, {
+          method: "POST",
+          credentials: "include",
+        });
 
-        if (updateErr) throw new Error(updateErr.message);
+        const json = await res.json();
+        if (!res.ok) {
+          throw new Error(json?.error ?? "Failed to mark paid");
+        }
 
         await fetchData();
       } catch (e: any) {
         console.error(e);
-        setError(e?.message ?? 'Failed to update payroll item status');
+        setError(e?.message ?? "Failed to update payroll item status");
       } finally {
         setUpdatingId(null);
       }
@@ -127,33 +109,34 @@ export default function usePayrollItems({ batchId, companyId }: Args) {
     [fetchData]
   );
 
+
   const markAllPaid = useCallback(async () => {
     setUpdatingAll(true);
     setError(null);
 
     try {
-      const pendingIds = items.filter((it) => it.status === 'pending').map((it) => it.id);
-      if (pendingIds.length === 0) return;
+      const res = await fetch("/api/admin/payroll-items/mark-all-paid", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ batchId }),
+      });
 
-      const { error: updateErr } = await supabase
-        .from('payroll_items')
-        .update({
-          status: "paid",
-          paid_at: new Date().toISOString(),
-        })
-        .in('id', pendingIds);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error ?? "Failed");
 
-      if (updateErr) throw new Error(updateErr.message);
+      setItems(json.items ?? []);
 
-      // 本地更新即可（更快）
-      setItems((prev) => prev.map((it) => (it.status === 'pending' ? { ...it, status: 'paid' } : it)));
+
+      // 或者乐观更新（更快，但先不建议，等你确认没坑再做）
+      // setItems(prev => prev.map(it => it.status === "pending" ? { ...it, status: "paid", paid_at: json.paid_at ?? it.paid_at } : it));
     } catch (e: any) {
       console.error(e);
-      setError(e?.message ?? 'Failed to mark all as paid');
+      setError(e?.message ?? "Failed to mark all as paid");
     } finally {
       setUpdatingAll(false);
     }
-  }, [items]);
+  }, [batchId, fetchData]);
 
   return {
     items,

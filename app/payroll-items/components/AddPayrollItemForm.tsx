@@ -41,8 +41,12 @@ export default function AddPayrollItemForm({
           <option value="">Select employee</option>
           {employees.map((emp) => (
             <option key={emp.id} value={emp.id}>
-              {emp.name} ({emp.wallet_address.slice(0, 6)}…{emp.wallet_address.slice(-4)})
+              {emp.name}
+              {emp.wallet_address
+                ? ` (${emp.wallet_address.slice(0, 6)}…${emp.wallet_address.slice(-4)})`
+                : ""}
             </option>
+
           ))}
         </select>
       </div>

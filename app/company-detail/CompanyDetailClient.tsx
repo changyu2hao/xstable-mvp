@@ -4,7 +4,6 @@ import PayrollBatchCreateForm from './PayrollBatchCreateForm';
 import EmployeeCreateForm from './EmployeeCreateForm';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import Link from 'next/link'; // 👈 新增
 
 interface Company {
@@ -19,8 +18,6 @@ interface Employee {
   email: string | null;
   wallet_address: string;
 }
-
-const supabase = createSupabaseBrowserClient();
 
 export default function CompanyDetailClient() {
   const searchParams = useSearchParams();
@@ -37,7 +34,7 @@ export default function CompanyDetailClient() {
   useEffect(() => {
     async function fetchData() {
       if (!companyId) {
-        setErrorMsg('No companyId in URL');
+        setErrorMsg("No companyId in URL");
         setLoading(false);
         return;
       }
@@ -46,101 +43,48 @@ export default function CompanyDetailClient() {
       setErrorMsg(null);
 
       try {
-        // 1) 查公司
-        const { data: companyData, error: companyError } = await supabase
-          .from('companies')
-          .select('*')
-          .eq('id', companyId)
-          .maybeSingle();
+        const res = await fetch(
+          `/api/admin/company-detail?companyId=${encodeURIComponent(companyId)}`,
+          { credentials: "include" }
+        );
 
-        if (companyError) {
-          console.error('Error fetching company:', companyError);
-          setErrorMsg(companyError.message);
-          return;
+        const text = await res.text();
+        const json = text ? JSON.parse(text) : null;
+
+        if (!res.ok) {
+          throw new Error(json?.error ?? `Failed (${res.status})`);
         }
 
-        if (!companyData) {
-          setErrorMsg('Company not found');
-          return;
-        }
-
-        setCompany(companyData as Company);
-
-        // 2) 查员工
-        const { data: employeesData, error: employeesError } = await supabase
-          .from('employees')
-          .select('*')
-          .eq('company_id', companyId)
-          .order('created_at', { ascending: false });
-
-        if (employeesError) {
-          console.error('Error fetching employees:', employeesError);
-          setErrorMsg(employeesError.message);
-          return;
-        }
-
-        setEmployees((employeesData || []) as Employee[]);
-
-        // 3) 查 payroll_batches
-        const { data: batchData, error: batchError } = await supabase
-          .from('payroll_batches')
-          .select('*')
-          .eq('company_id', companyId)
-          .order('pay_date', { ascending: false });
-
-        if (batchError) {
-          console.error('Error fetching payroll_batches:', batchError);
-        } else {
-          const safeBatches = batchData || [];
-          setBatches(safeBatches);
-
-          // ⭐ 新增：如果有 batch，再去查这些 batch 对应的 payroll_items
-          const batchIds = safeBatches.map((b: any) => b.id).filter(Boolean);
-
-          if (batchIds.length > 0) {
-            const { data: itemsData, error: itemsError } = await supabase
-              .from('payroll_items')
-              .select('batch_id, amount_usdc')
-              .in('batch_id', batchIds);
-
-            if (itemsError) {
-              console.error('Error fetching payroll_items stats:', itemsError);
-              setBatchStats({});
-            } else {
-              // 在前端按 batch_id 聚合：统计条数 + 总金额
-              const stats: Record<string, { itemCount: number; totalAmount: number }> =
-                {};
-
-              (itemsData || []).forEach((item: any) => {
-                const bId = item.batch_id as string;
-                const amount = Number(item.amount_usdc ?? 0);
-
-                if (!stats[bId]) {
-                  stats[bId] = { itemCount: 0, totalAmount: 0 };
-                }
-
-                stats[bId].itemCount += 1;
-                stats[bId].totalAmount += amount;
-              });
-
-              setBatchStats(stats);
-            }
-          } else {
-            // 没有 batch，就清空统计
-            setBatchStats({});
-          }
-        }
-
+        setCompany(json.company ?? null);
+        setEmployees(json.employees ?? []);
+        setBatches(json.batches ?? []);
+        setBatchStats(json.batchStats ?? {});
       } catch (err: any) {
-        console.error('Unexpected error in fetchData:', err);
-        setErrorMsg(err?.message ?? 'Failed to load company data');
+        console.error(err);
+        setErrorMsg(err?.message ?? "Failed to load company data");
       } finally {
-        // ✅ 无论成功还是出错，最后都关掉 loading
         setLoading(false);
       }
     }
     fetchData();
   }, [companyId]);
+
+
+  async function refetchAll() {
+    if (!companyId) return;
+    const res = await fetch(`/api/admin/company-detail?companyId=${encodeURIComponent(companyId)}`, {
+      credentials: "include",
+    });
+    const text = await res.text();
+    const json = text ? JSON.parse(text) : null;
+    if (!res.ok) throw new Error(json?.error ?? `Failed (${res.status})`);
+    setCompany(json.company ?? null);
+    setEmployees(json.employees ?? []);
+    setBatches(json.batches ?? []);
+    setBatchStats(json.batchStats ?? {});
+  }
+
+
 
   // ✅ 下面是 UI 渲染部分
 
@@ -206,7 +150,7 @@ export default function CompanyDetailClient() {
       </div>
 
       {/* ✅ 在这里插入“新增员工”表单 */}
-      <EmployeeCreateForm companyId={companyIdStr} />
+      <EmployeeCreateForm companyId={companyIdStr} onCreated={refetchAll} />
 
       {/* 员工列表 */}
       <div className="space-y-2">
@@ -238,7 +182,7 @@ export default function CompanyDetailClient() {
           Create and view payroll runs for this company.
         </p>
 
-        <PayrollBatchCreateForm companyId={companyIdStr} />
+        <PayrollBatchCreateForm companyId={companyIdStr} onCreated={refetchAll} />
 
         {/* 批次列表 */}
         <div className="space-y-2">

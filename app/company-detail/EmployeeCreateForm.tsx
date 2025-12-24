@@ -2,16 +2,15 @@
 'use client';
 
 import { FormEvent, useState, useEffect } from 'react';
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
-const supabase = createSupabaseBrowserClient();
 
 
 interface EmployeeCreateFormProps {
   companyId: string;
+  onCreated?: () => void | Promise<void>;
 }
 
 export default function EmployeeCreateForm({
-  companyId,
+  companyId,onCreated
 }: EmployeeCreateFormProps) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -21,125 +20,64 @@ export default function EmployeeCreateForm({
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false); // 可选，用来显示 Copied!
 
-  useEffect(() => {
-  supabase.auth.getUser().then(({ data }) => {
-    console.log("current user:", data.user?.id, data.user?.email);
-  });
-}, []);
-
-
   async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
     setInviteLink(null);
     setCopied(false);
-    e.preventDefault();
     setErrorMsg(null);
 
     const trimmedName = name.trim();
-    const trimmedWallet = walletAddress.trim();
+    const trimmedWallet = walletAddress.trim().toLowerCase();
+    const trimmedEmail = email.trim();
 
-    const normalizedWallet = trimmedWallet.toLowerCase();
-
-    // ✅ 基础校验
     if (!trimmedName) {
-      setErrorMsg('Employee name is required');
+      setErrorMsg("Employee name is required");
       return;
     }
-
     if (!trimmedWallet) {
-      setErrorMsg('Wallet address is required');
+      setErrorMsg("Wallet address is required");
       return;
     }
 
     setLoading(true);
 
-    const { data: existing, error: dupCheckError } = await supabase
-      .from('employees')
-      .select('id')
-      .eq('company_id', companyId)
-      .eq('wallet_address', normalizedWallet);
+    try {
+      const res = await fetch("/api/admin/employees", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyId,
+          name: trimmedName,
+          email: trimmedEmail,
+          walletAddress: trimmedWallet,
+        }),
+      });
 
-    if (dupCheckError) {
-      console.error('Error checking duplicate wallet:', dupCheckError);
-      setErrorMsg('Failed to validate wallet address, please try again.');
-      setLoading(false);
-      return;
-    }
+      const json = await res.json();
 
-    if (existing && existing.length > 0) {
-      setErrorMsg(
-        'This wallet address is already used by another employee in this company.'
-      );
-      setLoading(false);
-      return;
-    }
-
-    // 2️⃣ 再真正插入
-    const { data: inserted, error } = await supabase
-      .from('employees')
-      .insert({
-        company_id: companyId,
-        name: trimmedName,
-        email: email.trim() || null,
-        wallet_address: normalizedWallet,
-      })
-      .select('id')
-      .single();
-
-
-
-    setLoading(false);
-
-    if (error || !inserted) {
-      console.error('Error inserting employee:', error);
-
-      // 如果数据库开了唯一约束，重复会报 23505
-      if ((error as any).code === '23505') {
-        setErrorMsg(
-          'This wallet address is already used by another employee in this company.'
-        );
-      } else {
-        setErrorMsg(error.message);
+      if (!res.ok) {
+        setErrorMsg(json?.error ?? "Failed to create employee");
+        return;
       }
-      return;
-    }
 
-    // 3️⃣ generate invite token + expires
-    const token = crypto.randomUUID();
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      // server 返回 employee + invite_token
+      const token = json.employee.invite_token;
+      const link = `${window.location.origin}/claim?token=${token}`;
 
-    // 4️⃣ write token back to employees
-    const { data: updated, error: inviteErr } = await supabase
-      .from('employees')
-      .update({
-        invite_token: token,
-        invite_expires_at: expiresAt,
-      })
-      .eq('id', inserted.id)
-      .select('id, invite_token')
-      .single();
-
-    console.log('invite update:', { updated, inviteErr, insertedId: inserted.id, token });
-
-
-    if (inviteErr) {
-      console.error('Error generating invite token:', inviteErr);
-      setErrorMsg(`Employee created, but failed to generate invite link: ${inviteErr.message}`);
+      setInviteLink(link);
+      setCopied(false);
+      
+      setName("");
+      setEmail("");
+      setWalletAddress("");
+      await onCreated?.();
+    } catch (e: any) {
+      console.error(e);
+      setErrorMsg(e?.message ?? "Failed to create employee");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    // 5️⃣ build link + store in state
-    const link = `${window.location.origin}/claim?token=${token}`;
-    setInviteLink(link);
-    setCopied(false);
-
-    // ✅ 成功后清空表单
-    setName('');
-    setEmail('');
-    setWalletAddress('');
-
-    // ✅ 简单粗暴刷新，保证员工列表立刻更新
-    // window.location.reload();
   }
 
   return (

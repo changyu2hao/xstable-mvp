@@ -2,10 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import CompanyCreateForm from "./CompanyCreateForm";
-
-const supabase = createSupabaseBrowserClient();
 
 type Company = {
   id: string;
@@ -19,37 +16,39 @@ export default function CompanyDashboardClient() {
   const [data, setData] = useState<Company[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  async function refetchCompanies() {
+    const res = await fetch("/api/admin/companies", { credentials: "include" });
+    const text = await res.text();
+    const json = text ? JSON.parse(text) : null;
+    if (!res.ok) throw new Error(json?.error ?? `Failed (${res.status})`);
+    setData(json.companies ?? []);
+  }
+
   useEffect(() => {
     async function run() {
       setErrorMsg(null);
-
-      const { data: userData } = await supabase.auth.getUser();
-      console.log("Client user in company page:", userData.user?.id);
-
-      const { data: companies, error } = await supabase
-        .from("companies")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        console.error("Error fetching companies:", error);
-        setErrorMsg(error.message);
+      const res = await fetch("/api/admin/companies", {
+        credentials: "include",
+      });
+      const text = await res.text();
+      const json = text ? JSON.parse(text) : null;
+      if (!res.ok) {
+        setErrorMsg(json?.error ?? `Failed (${res.status})`);
         setData([]);
         return;
       }
-
-      setData(companies ?? []);
+      setData(json?.companies ?? []);
     }
-
     run();
   }, []);
+
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">Company Portal</h1>
       <p className="text-black-300">Companies registered in the system (MVP demo):</p>
 
-      <CompanyCreateForm />
+      <CompanyCreateForm onCreated={refetchCompanies} />
 
       {errorMsg ? (
         <div className="rounded border border-rose-900/60 bg-rose-950/40 p-3 text-rose-200 text-sm">

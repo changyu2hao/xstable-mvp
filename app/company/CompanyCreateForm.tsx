@@ -3,11 +3,8 @@
 
 import { useState, useTransition, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 
-const supabase = createSupabaseBrowserClient();
-
-export default function CompanyCreateForm() {
+export default function CompanyCreateForm({ onCreated }: { onCreated?: () => void | Promise<void> }) {
   const [name, setName] = useState('');
   const [ownerEmail, setOwnerEmail] = useState('');
   const [isPending, startTransition] = useTransition();
@@ -25,85 +22,79 @@ export default function CompanyCreateForm() {
       setErrorMsg('Company name is required');
       return;
     }
-    // ✅ 必须已登录（RLS 需要 auth.uid()）
-    const { data: userData, error: userErr } = await supabase.auth.getUser();
-    const user = userData.user;
 
-    if (userErr || !user) {
+    const res = await fetch("/api/admin/companies", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: trimmedName,
+        ownerEmail: trimmedEmail || null,
+      }),
+    });
+
+    const text = await res.text();
+    const json = text ? JSON.parse(text) : null;
+
+    if (res.status === 401) {
       setErrorMsg("You must be logged in to create a company.");
       return;
     }
 
-    const { error } = await supabase.from("companies").insert({
-      name: trimmedName,
-      owner_email: trimmedEmail || user.email || null,
-      owner_user_id: user.id, // ⭐关键
-    });
-
-    if (error) {
-      console.error("Error inserting company:", error);
-
-      if (error.code === "23505") {
-        setErrorMsg("A company with this name already exists.");
-      } else if (error.code === "42501") {
-        setErrorMsg("Blocked by RLS. (owner_user_id must match your account)");
-      } else {
-        setErrorMsg(error.message);
-      }
+    if (!res.ok) {
+      setErrorMsg(json?.error ?? `Failed to create company (${res.status})`);
       return;
     }
 
-    // 成功：清空表单
     setName('');
     setOwnerEmail('');
+    await onCreated?.();
 
-    // 刷新公司列表
     startTransition(() => {
       router.refresh();
     });
   }
 
-
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="space-y-3 rounded border border-slate-700 bg-slate-900 p-4"
-    >
-      <h2 className="text-lg font-semibold text-slate-300">Add a new company (demo)</h2>
-
-      <div className="space-y-1">
-        <label className="block text-sm text-slate-300">
-          Company name <span className="text-red-400">*</span>
-        </label>
-        <input
-          className="w-full rounded border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-400"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. XStable Labs"
-        />
-      </div>
-
-      <div className="space-y-1">
-        <label className="block text-sm text-slate-300">Owner email</label>
-        <input
-          className="w-full rounded border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-400"
-          value={ownerEmail}
-          onChange={(e) => setOwnerEmail(e.target.value)}
-          placeholder="e.g. founder@xstable.io"
-        />
-      </div>
-
-      {errorMsg && (
-        <p className="text-sm text-red-400">Error: {errorMsg}</p>
-      )}
-
-      <button
-        type="submit"
-        disabled={isPending}
-        className="rounded bg-emerald-500 px-4 py-2 text-sm font-medium text-slate-950 disabled:opacity-60"
+    <div suppressHydrationWarning>
+      <form
+        onSubmit={handleSubmit}
+        className="space-y-3 rounded border border-slate-700 bg-slate-900 p-4"
       >
-        {isPending ? 'Creating...' : 'Create company'}
-      </button>
-    </form>
+        <h2 className="text-lg font-semibold text-slate-300">Add a new company (demo)</h2>
+
+        <div className="space-y-1">
+          <label className="block text-sm text-slate-300">
+            Company name <span className="text-red-400">*</span>
+          </label>
+          <input
+            className="w-full rounded border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-400"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. XStable Labs"
+          />
+        </div>
+
+        <div className="space-y-1">
+          <label className="block text-sm text-slate-300">Owner email</label>
+          <input
+            className="w-full rounded border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-400"
+            value={ownerEmail}
+            onChange={(e) => setOwnerEmail(e.target.value)}
+            placeholder="e.g. founder@xstable.io"
+          />
+        </div>
+
+        {errorMsg && <p className="text-sm text-red-400">Error: {errorMsg}</p>}
+
+        <button
+          type="submit"
+          disabled={isPending}
+          className="rounded bg-emerald-500 px-4 py-2 text-sm font-medium text-slate-950 disabled:opacity-60"
+        >
+          {isPending ? 'Creating...' : 'Create company'}
+        </button>
+      </form>
+    </div>
   );
 }
