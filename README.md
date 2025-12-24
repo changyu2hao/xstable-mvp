@@ -1,8 +1,8 @@
 # XStable Payroll (MVP)
 
-**XStable Payroll** is an MVP payroll system designed to explore **secure, server-first payroll workflows** using **Next.js App Router + Supabase**, with a future path toward **USDC / on-chain payroll**.
+**XStable Payroll** is an MVP payroll system designed to explore **secure, server-first payroll workflows** using **Next.js App Router + Supabase**, with a clear architectural path toward **USDC / on-chain payroll**.
 
-This repository represents the project up to **Phase 2 (Security & Employee Payslip)**.
+This repository represents the project up to **Phase 2 (Security Boundary & Employee Payslip)**.
 
 ---
 
@@ -10,14 +10,16 @@ This repository represents the project up to **Phase 2 (Security & Employee Pays
 
 ### Frontend / App
 - **Next.js** (App Router)
-- **React** (Client & Server Components)
+- **React** (Server & Client Components)
 - **TypeScript**
 - **Tailwind CSS**
 
 ### Backend / Infra
-- **Supabase** (Auth, Postgres, RLS)
+- **Supabase**
+  - Auth
+  - Postgres
+  - Row Level Security (RLS)
 - **Supabase SSR** (`@supabase/ssr`)
-- **Row Level Security (RLS)**
 
 ### Documents
 - **pdf-lib** (server-only PDF generation)
@@ -25,10 +27,12 @@ This repository represents the project up to **Phase 2 (Security & Employee Pays
 ---
 
 ## 🎯 Project Goals
+
 - Build a **realistic payroll MVP**, not just a demo UI
-- Enforce **strict permission boundaries** (owner vs employee)
+- Enforce **strict permission boundaries** (company owner vs employee)
 - Ensure **all sensitive operations are server-only**
-- Prepare for future **on-chain payroll integration**
+- Use **RLS as the final authority** for data access
+- Prepare a clean foundation for **on-chain payroll integration**
 
 ---
 
@@ -37,23 +41,27 @@ This repository represents the project up to **Phase 2 (Security & Employee Pays
 ### ✅ Authentication
 - Email/password **login & logout**
 - Persistent sessions via **Supabase Auth**
-- Secure **SSR-compatible auth handling**
+- Secure **SSR-compatible session handling**
+- Middleware-based session propagation
 
 ---
 
 ### ✅ Company & Employee Model
 - Companies with explicit **`owner_user_id`**
-- Employees belong to a company
-- Employee claim flow via **invite token**
+- Employees belong to a single company
+- Secure **employee claim flow** via invite token
 - Claim implemented using **RPC (security definer)** for RLS safety
 
 ---
 
 ### ✅ Payroll System
 - Payroll batches & payroll items
-- Status lifecycle: `pending | paid | failed`
-- Strong DB constraints  
-  *(e.g. `paid_at` required when status = paid)*
+- Status lifecycle:
+  - `pending`
+  - `paid`
+  - `failed`
+- Strong database constraints  
+  *(e.g. `paid_at` required when status = `paid`)*
 
 ---
 
@@ -61,11 +69,13 @@ This repository represents the project up to **Phase 2 (Security & Employee Pays
 - `/me/payroll` — employee payroll list
 - `/me/payroll/[id]` — payslip detail page
 - Employee can **only access their own payroll items**
+- All sensitive reads handled via **server-only APIs**
 
 ---
 
 ### ✅ Server-only Payslip PDF
-- Secure API route: `/api/me/payroll/[id]/pdf`
+- Secure API route:  
+  `GET /api/me/payroll/[id]/pdf`
 - Server-side authentication & ownership validation
 - Binary PDF generation using **pdf-lib**
 - **No client-side data trust**
@@ -73,6 +83,7 @@ This repository represents the project up to **Phase 2 (Security & Employee Pays
 ---
 
 ### ✅ Security (Phase 2)
+
 **Row Level Security (RLS)** enabled on:
 - `companies`
 - `employees`
@@ -83,43 +94,48 @@ Policies enforce:
 - Company owners can only manage **their own data**
 - Employees can only **read their own records**
 - Client-side Supabase access is **non-authoritative**
-- Critical mutations designed for **server-only or RPC**
+- Critical mutations implemented via:
+  - Server-only API routes
+  - RPC where token-based or atomic logic is required
 
 ---
 
 ## 🗂️ Project Structure (Simplified)
 
 app/
-company/ # Company dashboard (client-rendered)
+company/                # Company dashboard (client-rendered)
 me/
-payroll/ # Employee payroll pages
+payroll/              # Employee payroll pages
 api/
-me/payroll/[id]/pdf/ # Server-only PDF export
-
+me/
+payroll/
+route.ts           # Employee payroll list (server-only)
+[id]/route.ts      # Single payslip (server-only)
+[id]/pdf/route.ts  # Server-only PDF export
 components/
 LogoutButton.tsx
-
 lib/
 supabase/
-browser.ts # createSupabaseBrowserClient
-server.ts # createServerClient (SSR / routes)
-
-middleware.ts # Auth/session propagation
+browser.ts             # createSupabaseBrowserClient
+server.ts              # createServerClient (SSR / routes)
+middleware.ts              # Auth/session propagation
 
 ---
 
 ## 🧠 Architectural Decisions
+
 - **App Router default = Server Components**
-- Client Components used **only when session-dependent**
+- Client Components used **only for UI & interaction**
 - **No sensitive logic trusted to the browser**
 - **RLS as the final authority** for data access
-- RPC used where **RLS + tokens** are required (employee claim)
+- Server APIs define explicit permission boundaries
+- RPC used where **RLS + token-based access** is required (employee claim)
 
 ---
 
 ## 🛣️ Roadmap
 
-### Phase 2 (In Progress / Partially Complete)
+### Phase 2 (Completed / Stabilizing)
 - [x] Employee payslip portal
 - [x] Server-only PDF export
 - [x] RLS policies
@@ -127,19 +143,22 @@ middleware.ts # Auth/session propagation
 - [ ] Add server APIs for payroll management
 
 ### Phase 3 (Planned)
-- USDC / on-chain payroll integration
-- Transaction hash → blockchain explorer
+- USDC / on-chain payroll execution
+- Transaction hash storage & lifecycle
+- Blockchain explorer integration (e.g. BaseScan)
 - Admin audit logs
 - Multi-company / multi-admin support
 
 ---
 
 ## ⚠️ Notes
-- This repository is an **MVP / learning project**
+
+- This repository is an **MVP / learning-oriented project**
 - **Not production-ready**
-- Focused on **correct architecture & security boundaries**, not polish
+- Focused on **correct architecture, security boundaries, and real-world patterns**
+- UI polish and scalability optimizations are intentionally secondary
 
 ---
 
 Built by **Changyu Huang**  
-Exploring **secure payroll systems**, **Web3-ready architecture**, and **real-world full-stack patterns**.
+Exploring **secure payroll systems**, **server-first architecture**, and **Web3-ready full-stack design**.
