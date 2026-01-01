@@ -1,14 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
+
 const supabase = createSupabaseBrowserClient();
 
-export default function LoginClient() {
+export default function LoginClient({ redirectTo }: { redirectTo: string | null }) {
   const router = useRouter();
-  const sp = useSearchParams();
-  const next = sp.get("next") || "/company";
+  const next = redirectTo || "/company"; // ✅ 默认跳转
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -49,14 +49,9 @@ export default function LoginClient() {
           Use your email and password to continue
         </p>
 
-        <form
-          onSubmit={handleLogin}
-          className="mt-6 space-y-4"
-        >
+        <form onSubmit={handleLogin} className="mt-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-300">
-              Email
-            </label>
+            <label className="block text-sm font-medium text-slate-300">Email</label>
             <input
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -68,9 +63,7 @@ export default function LoginClient() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-300">
-              Password
-            </label>
+            <label className="block text-sm font-medium text-slate-300">Password</label>
             <input
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -81,9 +74,7 @@ export default function LoginClient() {
             />
           </div>
 
-          {msg && (
-            <p className="text-sm text-rose-400">{msg}</p>
-          )}
+          {msg && <p className="text-sm text-rose-400">{msg}</p>}
 
           <button
             type="submit"
