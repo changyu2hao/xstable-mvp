@@ -2,9 +2,8 @@
 
 import PayrollBatchCreateForm from './PayrollBatchCreateForm';
 import EmployeeCreateForm from './EmployeeCreateForm';
-import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import Link from 'next/link'; // 👈 新增
+import Link from 'next/link';
 
 interface Company {
   id: string;
@@ -19,9 +18,7 @@ interface Employee {
   wallet_address: string;
 }
 
-export default function CompanyDetailClient() {
-  const searchParams = useSearchParams();
-  const companyId = searchParams.get('companyId'); // ⭐ 这里从 URL 里拿参数
+export default function CompanyDetailClient({ companyId }: { companyId: string | null }) {
   const [company, setCompany] = useState<Company | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,10 +28,11 @@ export default function CompanyDetailClient() {
     Record<string, { itemCount: number; totalAmount: number }>
   >({});
 
+
   useEffect(() => {
     async function fetchData() {
       if (!companyId) {
-        setErrorMsg("No companyId in URL");
+        setErrorMsg('No companyId in URL');
         setLoading(false);
         return;
       }
@@ -45,15 +43,13 @@ export default function CompanyDetailClient() {
       try {
         const res = await fetch(
           `/api/admin/company-detail?companyId=${encodeURIComponent(companyId)}`,
-          { credentials: "include" }
+          { credentials: 'include' }
         );
 
         const text = await res.text();
         const json = text ? JSON.parse(text) : null;
 
-        if (!res.ok) {
-          throw new Error(json?.error ?? `Failed (${res.status})`);
-        }
+        if (!res.ok) throw new Error(json?.error ?? `Failed (${res.status})`);
 
         setCompany(json.company ?? null);
         setEmployees(json.employees ?? []);
@@ -61,7 +57,7 @@ export default function CompanyDetailClient() {
         setBatchStats(json.batchStats ?? {});
       } catch (err: any) {
         console.error(err);
-        setErrorMsg(err?.message ?? "Failed to load company data");
+        setErrorMsg(err?.message ?? 'Failed to load company data');
       } finally {
         setLoading(false);
       }
@@ -72,9 +68,10 @@ export default function CompanyDetailClient() {
 
   async function refetchAll() {
     if (!companyId) return;
-    const res = await fetch(`/api/admin/company-detail?companyId=${encodeURIComponent(companyId)}`, {
-      credentials: "include",
-    });
+    const res = await fetch(
+      `/api/admin/company-detail?companyId=${encodeURIComponent(companyId)}`,
+      { credentials: 'include' }
+    );
     const text = await res.text();
     const json = text ? JSON.parse(text) : null;
     if (!res.ok) throw new Error(json?.error ?? `Failed (${res.status})`);
@@ -83,8 +80,6 @@ export default function CompanyDetailClient() {
     setBatches(json.batches ?? []);
     setBatchStats(json.batchStats ?? {});
   }
-
-
 
   // ✅ 下面是 UI 渲染部分
 
