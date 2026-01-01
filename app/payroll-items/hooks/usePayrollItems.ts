@@ -52,23 +52,23 @@ export default function usePayrollItems({ batchId }: Args) {
     fetchData();
   }, [fetchData]);
 
-  useEffect(() => {
-    const submittedItems = items.filter(i => i.status === "submitted" && i.tx_hash);
+  // useEffect(() => {
+  //   const submittedItems = items.filter(i => i.status === "submitted" && i.tx_hash);
 
-    if (submittedItems.length === 0) return;
-    const timer = setInterval(async () => {
-      for (const it of submittedItems) {
-        await fetch(`/api/admin/payroll-items/${it.id}/confirm`, {
-          method: "POST",
-          credentials: "include",
-        });
-      }
+  //   if (submittedItems.length === 0) return;
+  //   const timer = setInterval(async () => {
+  //     for (const it of submittedItems) {
+  //       await fetch(`/api/admin/payroll-items/${it.id}/confirm`, {
+  //         method: "POST",
+  //         credentials: "include",
+  //       });
+  //     }
 
-      await fetchData(); // ✅ 用 hook 内部的 fetchData
-    }, 10000); // 10 秒轮询
+  //     await fetchData(); // ✅ 用 hook 内部的 fetchData
+  //   }, 10000); // 10 秒轮询
 
-    return () => clearInterval(timer);
-  }, [items, fetchData]);
+  //   return () => clearInterval(timer);
+  // }, [items, fetchData]);
 
 
   const createItem = useCallback(
