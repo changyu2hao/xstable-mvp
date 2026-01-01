@@ -8,7 +8,7 @@ const supabase = createSupabaseBrowserClient();
 
 export default function LoginClient({ redirectTo }: { redirectTo: string | null }) {
   const router = useRouter();
-  const next = redirectTo || "/company"; // ✅ 默认跳转
+  const next = redirectTo || "/company";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -18,15 +18,9 @@ export default function LoginClient({ redirectTo }: { redirectTo: string | null 
     e.preventDefault();
     setMsg("");
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
-    if (error) {
-      setMsg(error.message);
-      return;
-    }
+    if (error) return setMsg(error.message);
 
     if (data.user) {
       router.replace(next);
@@ -45,9 +39,6 @@ export default function LoginClient({ redirectTo }: { redirectTo: string | null 
     <div className="min-h-screen flex items-center justify-center bg-slate-950 px-4">
       <div className="w-full max-w-md rounded-xl border border-slate-800 bg-slate-900 p-6 shadow-lg">
         <h1 className="text-2xl font-semibold text-white">Sign in</h1>
-        <p className="mt-1 text-sm text-slate-400">
-          Use your email and password to continue
-        </p>
 
         <form onSubmit={handleLogin} className="mt-6 space-y-4">
           <div>
@@ -57,7 +48,7 @@ export default function LoginClient({ redirectTo }: { redirectTo: string | null 
               onChange={(e) => setEmail(e.target.value)}
               type="email"
               required
-              className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100"
               placeholder="you@example.com"
             />
           </div>
@@ -69,24 +60,21 @@ export default function LoginClient({ redirectTo }: { redirectTo: string | null 
               onChange={(e) => setPassword(e.target.value)}
               type="password"
               required
-              className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100"
               placeholder="••••••••"
             />
           </div>
 
           {msg && <p className="text-sm text-rose-400">{msg}</p>}
 
-          <button
-            type="submit"
-            className="w-full rounded-md bg-indigo-600 py-2 text-sm font-medium text-white hover:bg-indigo-500 transition"
-          >
+          <button type="submit" className="w-full rounded-md bg-indigo-600 py-2 text-sm font-medium text-white">
             Sign in
           </button>
 
           <button
             type="button"
             onClick={handleLogout}
-            className="w-full rounded-md border border-slate-700 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 transition"
+            className="w-full rounded-md border border-slate-700 py-2 text-sm font-medium text-slate-300"
           >
             Sign out
           </button>
@@ -94,9 +82,7 @@ export default function LoginClient({ redirectTo }: { redirectTo: string | null 
 
         <p className="mt-6 text-xs text-slate-500">
           After login, you will be redirected to{" "}
-          <code className="rounded bg-slate-800 px-1 py-0.5 text-slate-300">
-            {next}
-          </code>
+          <code className="rounded bg-slate-800 px-1 py-0.5 text-slate-300">{next}</code>
         </p>
       </div>
     </div>
