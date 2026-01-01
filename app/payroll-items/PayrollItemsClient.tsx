@@ -9,7 +9,6 @@ import usePayrollItems from './hooks/usePayrollItems';
 import usePayrollFilters from './hooks/usePayrollFilters';
 import PayrollTable from './components/PayrollTable';
 
-
 /* =========================
    组件主体
 ========================= */
@@ -44,15 +43,14 @@ export default function PayrollItemsClient() {
     error,
     setError,
     creating,
-    updatingId,
     updatingAll,
     createItem,
-    markPaid,
-    markAllPaid,
+    checkStatus,
+    confirmAllSubmitted,
   } = usePayrollItems({
     batchId,
-    companyId,
   });
+
 
   const {
     statusFilter,
@@ -121,7 +119,8 @@ export default function PayrollItemsClient() {
       (sum, it) => sum + Number(it.amount_usdc ?? 0),
       0
     );
-    const summaryPending = filteredItems.filter((it) => it.status === 'pending').length;
+    const summaryCreated = filteredItems.filter((it) => it.status === 'created').length;
+    const summarySubmitted = filteredItems.filter((it) => it.status === 'submitted').length;
     const summaryPaid = filteredItems.filter((it) => it.status === 'paid').length;
     const summaryFailed = filteredItems.filter((it) => it.status === 'failed').length;
 
@@ -146,7 +145,8 @@ export default function PayrollItemsClient() {
       `Summary`,
       `Item Count,${filteredItems.length}`,
       `Total Amount (USDC),${summaryTotal.toFixed(2)}`,
-      `Pending Count,${summaryPending}`,
+      `Created Count,${summaryCreated}`,
+      `Submitted Count,${summarySubmitted}`,
       `Paid Count,${summaryPaid}`,
       `Failed Count,${summaryFailed}`,
       `Exported At,${new Date().toISOString()}`,
@@ -180,7 +180,11 @@ export default function PayrollItemsClient() {
     (sum, item) => sum + Number(item.amount_usdc ?? 0),
     0
   );
-  const pendingCount = items.filter((it) => it.status === 'pending').length;
+
+  const formattedTotal = totalAmount.toFixed(2);
+
+  const createdCount = items.filter((it) => it.status === 'created').length;
+  const submittedCount = items.filter((it) => it.status === 'submitted').length;
   const paidCount = items.filter((it) => it.status === 'paid').length;
   const failedCount = items.filter((it) => it.status === 'failed').length;
 
@@ -194,19 +198,20 @@ export default function PayrollItemsClient() {
       {/* 顶部信息：两行布局，避免拥挤 */}
       <PayrollHeader
         batchId={batchId}
-        totalAmount={totalAmount}
-        pendingCount={pendingCount}
+        totalAmount={formattedTotal}
+        createdCount={createdCount}
+        submittedCount={submittedCount}
         paidCount={paidCount}
         failedCount={failedCount}
         statusFilter={statusFilter}
         q={q}
         updatingAll={updatingAll}
-        disableMarkAll={pendingCount === 0}
+        disableMarkAll={submittedCount === 0}
         onChangeStatus={setStatusFilter}
         onChangeQuery={setQ}
         onExportCsv={exportCsv}
         onResetSort={resetSort}
-        onMarkAllPaid={markAllPaid}
+        onConfirmAllSubmitted={confirmAllSubmitted}
       />
 
       {/* 新增明细表单 */}
@@ -228,7 +233,7 @@ export default function PayrollItemsClient() {
         sortKey={sortKey}
         sortDir={sortDir}
         toggleSort={toggleSort}
-        onMarkPaid={markPaid}
+        onCheckStatus={checkStatus}
         onCopy={copyToClipboard}
         creating={creating}
       />

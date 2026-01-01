@@ -2,28 +2,30 @@
 
 export default function PayrollHeader(props: {
   batchId: string;
-  totalAmount: number;
-  pendingCount: number;
+  totalAmount: string;
+  createdCount: number;
+  submittedCount: number;
   paidCount: number;
   failedCount: number;
 
-  statusFilter: 'all' | 'pending' | 'paid' | 'failed';
+  statusFilter: 'all' | 'created' | 'submitted' | 'paid' | 'failed';
   q: string;
 
   updatingAll: boolean;
   disableMarkAll: boolean;
 
-  onChangeStatus: (v: 'all' | 'pending' | 'paid' | 'failed') => void;
+  onChangeStatus: (v: 'all' | 'created' | 'submitted' | 'paid' | 'failed') => void;
   onChangeQuery: (v: string) => void;
 
   onExportCsv: () => void;
   onResetSort: () => void;
-  onMarkAllPaid: () => void;
+  onConfirmAllSubmitted: () => void;
 }) {
   const {
     batchId,
     totalAmount,
-    pendingCount,
+    createdCount,
+    submittedCount,
     paidCount,
     failedCount,
     statusFilter,
@@ -34,7 +36,7 @@ export default function PayrollHeader(props: {
     onChangeQuery,
     onExportCsv,
     onResetSort,
-    onMarkAllPaid,
+    onConfirmAllSubmitted,
   } = props;
 
   return (
@@ -47,22 +49,25 @@ export default function PayrollHeader(props: {
 
         <div>
           <div className="text-sm text-slate-600">Total (USDC)</div>
-          <div className="text-2xl font-semibold text-slate-900">{totalAmount}</div>
+          <div className="text-2xl font-semibold text-slate-900 tabular-nums min-w-[6rem] text-right">
+            {totalAmount}
+          </div>
         </div>
 
         <div className="flex items-center gap-4">
-          <div className="flex gap-3 text-xs text-slate-700">
-            <span>Pending: <strong>{pendingCount}</strong></span>
+          <div className="flex gap-3 text-xs text-slate-700 tabular-nums">
+            <span>Created: <strong>{createdCount}</strong></span>
+            <span>Submitted: <strong>{submittedCount}</strong></span>
             <span>Paid: <strong>{paidCount}</strong></span>
             <span>Failed: <strong>{failedCount}</strong></span>
           </div>
 
           <button
-            onClick={onMarkAllPaid}
+            onClick={onConfirmAllSubmitted}
             disabled={updatingAll || disableMarkAll}
             className="px-3 py-1.5 rounded bg-emerald-500 text-slate-950 text-sm disabled:opacity-60"
           >
-            {updatingAll ? 'Updating...' : 'Mark all pending as paid'}
+            {updatingAll ? 'Updating...' : 'Check all statuses'}
           </button>
         </div>
       </div>
@@ -74,7 +79,8 @@ export default function PayrollHeader(props: {
           className="border border-slate-600 rounded bg-slate-800 text-slate-100 px-2 py-1 text-sm"
         >
           <option value="all">All</option>
-          <option value="pending">Pending</option>
+          <option value="created">Created</option>
+          <option value="submitted">Submitted</option>
           <option value="paid">Paid</option>
           <option value="failed">Failed</option>
         </select>

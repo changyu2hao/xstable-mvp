@@ -82,6 +82,9 @@ export default function MePayrollDetailClient() {
 
   const canDownload = !!idStr && isUuid(idStr);
   const pdfHref = canDownload ? `/api/me/payroll/${encodeURIComponent(idStr)}/pdf` : "";
+  const basescanTx = item?.tx_hash
+    ? `https://sepolia.basescan.org/tx/${item.tx_hash}`
+    : null;
 
   return (
     <div className="min-h-screen bg-slate-950 px-4 py-8 text-slate-100">
@@ -144,7 +147,26 @@ export default function MePayrollDetailClient() {
 
             <div>
               <div className="text-slate-400">Tx hash</div>
-              <div className="mt-1 break-all text-slate-200">{item.tx_hash ?? "—"}</div>
+              {item.tx_hash ? (
+                <div className="mt-1 space-y-1">
+                  <div className="break-all text-slate-200">{item.tx_hash}</div>
+
+                  <a
+                    href={`https://sepolia.basescan.org/tx/${item.tx_hash}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-block text-xs text-indigo-300 hover:underline"
+                  >
+                    View on BaseScan ↗
+                  </a>
+
+                  {item.status === "pending" ? (
+                    <p className="text-xs text-slate-400">Confirming on-chain…</p>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="mt-1 text-slate-300">—</div>
+              )}
             </div>
           </div>
         ) : (

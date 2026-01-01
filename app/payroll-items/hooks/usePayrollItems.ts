@@ -5,10 +5,9 @@ import { Employee, PayrollItem } from '../types';
 
 type Args = {
   batchId: string;
-  companyId: string | null;
 };
 
-export default function usePayrollItems({ batchId, companyId }: Args) {
+export default function usePayrollItems({ batchId }: Args) {
   const [items, setItems] = useState<PayrollItem[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,8 +30,13 @@ export default function usePayrollItems({ batchId, companyId }: Args) {
       });
 
       // 2) employees list (for dropdown)
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Failed to load payroll items");
+      const text = await res.text();
+      let json: any = null;
+      try { json = text ? JSON.parse(text) : null; } catch { }
+
+      if (!res.ok) {
+        throw new Error(json?.error ?? json?.detail ?? text ?? `Failed (${res.status})`);
+      }
       setItems(json.items ?? []);
       setEmployees(json.employees ?? []); // ⭐关键
     } catch (e: any) {
@@ -47,6 +51,25 @@ export default function usePayrollItems({ batchId, companyId }: Args) {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    const submittedItems = items.filter(i => i.status === "submitted" && i.tx_hash);
+
+    if (submittedItems.length === 0) return;
+    const timer = setInterval(async () => {
+      for (const it of submittedItems) {
+        await fetch(`/api/admin/payroll-items/${it.id}/confirm`, {
+          method: "POST",
+          credentials: "include",
+        });
+      }
+
+      await fetchData(); // ✅ 用 hook 内部的 fetchData
+    }, 10000); // 10 秒轮询
+
+    return () => clearInterval(timer);
+  }, [items, fetchData]);
+
 
   const createItem = useCallback(
     async (employeeId: string, amountNumber: number) => {
@@ -65,11 +88,18 @@ export default function usePayrollItems({ batchId, companyId }: Args) {
           }),
         });
 
-        const json = await res.json();
-        if (!res.ok) {
-          throw new Error(json?.error ?? "Failed to create payroll item");
-        }
+        const text = await res.text();
+        const json = text ? JSON.parse(text) : null;
 
+        if (!res.ok) {
+          // 把后端 detail/message 也展示出来
+          throw new Error(
+            json?.error ??
+            json?.message ??
+            json?.detail ??
+            `Failed to create payroll item (${res.status})`
+          );
+        }
         await fetchData();
       } catch (e: any) {
         console.error(e);
@@ -82,61 +112,55 @@ export default function usePayrollItems({ batchId, companyId }: Args) {
     [batchId, fetchData]
   );
 
-  const markPaid = useCallback(
-    async (itemId: string) => {
-      setUpdatingId(itemId);
-      setError(null);
-
-      try {
-        const res = await fetch(`/api/admin/payroll-items/${encodeURIComponent(itemId)}/mark-paid`, {
-          method: "POST",
-          credentials: "include",
-        });
-
-        const json = await res.json();
-        if (!res.ok) {
-          throw new Error(json?.error ?? "Failed to mark paid");
-        }
-
-        await fetchData();
-      } catch (e: any) {
-        console.error(e);
-        setError(e?.message ?? "Failed to update payroll item status");
-      } finally {
-        setUpdatingId(null);
-      }
-    },
-    [fetchData]
-  );
-
-
-  const markAllPaid = useCallback(async () => {
-    setUpdatingAll(true);
+  const checkStatus = useCallback(async (itemId: string) => {
+    setUpdatingId(itemId);
     setError(null);
 
     try {
-      const res = await fetch("/api/admin/payroll-items/mark-all-paid", {
+      const res = await fetch(`/api/admin/payroll-items/${encodeURIComponent(itemId)}/confirm`, {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ batchId }),
       });
 
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.error ?? "Failed");
+      const text = await res.text();
+      let json: any = null;
+      try { json = text ? JSON.parse(text) : null; } catch { }
 
-      setItems(json.items ?? []);
+      if (!res.ok) {
+        throw new Error(json?.error ?? json?.detail ?? text ?? "Failed to confirm");
+      }
 
-
-      // 或者乐观更新（更快，但先不建议，等你确认没坑再做）
-      // setItems(prev => prev.map(it => it.status === "pending" ? { ...it, status: "paid", paid_at: json.paid_at ?? it.paid_at } : it));
+      await fetchData();
     } catch (e: any) {
       console.error(e);
-      setError(e?.message ?? "Failed to mark all as paid");
+      setError(e?.message ?? "Failed to check status");
     } finally {
-      setUpdatingAll(false);
+      setUpdatingId(null);
     }
-  }, [batchId, fetchData]);
+  }, [fetchData]);
+
+  const confirmAllSubmitted = useCallback(async () => {
+  setUpdatingAll(true);
+  setError(null);
+
+  try {
+    const toConfirm = items.filter(i => i.status === "submitted" && i.tx_hash);
+
+    for (const it of toConfirm) {
+      await fetch(`/api/admin/payroll-items/${encodeURIComponent(it.id)}/confirm`, {
+        method: "POST",
+        credentials: "include",
+      });
+    }
+
+    await fetchData();
+  } catch (e: any) {
+    console.error(e);
+    setError(e?.message ?? "Failed to confirm all submitted");
+  } finally {
+    setUpdatingAll(false);
+  }
+}, [items, fetchData]);
 
   return {
     items,
@@ -151,7 +175,7 @@ export default function usePayrollItems({ batchId, companyId }: Args) {
 
     refetch: fetchData,
     createItem,
-    markPaid,
-    markAllPaid,
+    checkStatus,
+    confirmAllSubmitted
   };
 }

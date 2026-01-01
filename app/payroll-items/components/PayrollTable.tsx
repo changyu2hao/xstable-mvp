@@ -9,7 +9,7 @@ interface Props {
   sortKey: 'created_at' | 'amount_usdc' | 'employee_name';
   sortDir: 'asc' | 'desc';
   toggleSort: (key: 'created_at' | 'amount_usdc' | 'employee_name') => void;
-  onMarkPaid: (id: string) => void;
+  onCheckStatus: (id: string) => void;
   onCopy: (text: string, label?: string) => void;
   creating: boolean;
 }
@@ -20,7 +20,7 @@ export default function PayrollTable({
   sortKey,
   sortDir,
   toggleSort,
-  onMarkPaid,
+  onCheckStatus,
   onCopy,
   creating,
 }: Props) {
@@ -104,7 +104,7 @@ export default function PayrollTable({
                 key={item.id}
                 item={item}
                 isUpdating={creating}
-                onMarkPaid={onMarkPaid}
+                onCheckStatus={onCheckStatus}
                 onCopy={onCopy}
               />
             ))}

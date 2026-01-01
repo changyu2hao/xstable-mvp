@@ -148,22 +148,37 @@ export default function MePayrollClient() {
                                                     <StatusBadge status={it.status} />
                                                 </p>
                                                 {it.tx_hash ? (
-                                                    <button
-                                                        type="button"
-                                                        onClick={async () => {
-                                                            await navigator.clipboard.writeText(it.tx_hash!);
-                                                            setCopiedTxId(it.id);
-                                                            setTimeout(() => setCopiedTxId(null), 1200);
-                                                        }}
-                                                        className="mt-1 block text-xs text-slate-400 hover:text-slate-200"
-                                                        title="Click to copy transaction hash"
-                                                    >
-                                                        {copiedTxId === it.id ? (
-                                                            <span className="text-emerald-400">Copied!</span>
-                                                        ) : (
-                                                            <>Tx: {it.tx_hash.slice(0, 8)}…{it.tx_hash.slice(-6)}</>
-                                                        )}
-                                                    </button>
+                                                    <div className="mt-1 flex items-center gap-3">
+                                                        <button
+                                                            type="button"
+                                                            onClick={async () => {
+                                                                await navigator.clipboard.writeText(it.tx_hash!);
+                                                                setCopiedTxId(it.id);
+                                                                setTimeout(() => setCopiedTxId(null), 1200);
+                                                            }}
+                                                            className="block text-xs text-slate-400 hover:text-slate-200"
+                                                            title="Click to copy transaction hash"
+                                                        >
+                                                            {copiedTxId === it.id ? (
+                                                                <span className="text-emerald-400">Copied!</span>
+                                                            ) : (
+                                                                <>Tx: {it.tx_hash.slice(0, 8)}…{it.tx_hash.slice(-6)}</>
+                                                            )}
+                                                        </button>
+
+                                                        <a
+                                                            href={`https://sepolia.basescan.org/tx/${it.tx_hash}`}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="text-xs text-indigo-300 hover:underline"
+                                                        >
+                                                            BaseScan ↗
+                                                        </a>
+
+                                                        {it.status === "pending" ? (
+                                                            <span className="text-xs text-slate-400">Confirming…</span>
+                                                        ) : null}
+                                                    </div>
                                                 ) : null}
                                             </div>
                                             <div className="shrink-0 text-right">

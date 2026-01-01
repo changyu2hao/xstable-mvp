@@ -7,7 +7,7 @@ export interface Employee {
 export interface PayrollItem {
   id: string;
   amount_usdc: number;
-  status: 'pending' | 'paid' | 'failed';
+  status: 'created' | 'submitted' | 'paid' | 'failed';
   tx_hash: string | null;
   created_at: string;
   employees: Employee | Employee[] | null;

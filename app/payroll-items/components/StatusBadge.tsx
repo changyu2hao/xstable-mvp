@@ -23,11 +23,31 @@ export default function StatusBadge({ status }: {
     );
   }
 
+  if (status === 'submitted') {
+    return (
+      <span className="inline-flex px-2 py-0.5 rounded
+                       bg-blue-900/30 text-blue-200 text-xs
+                       border border-blue-600">
+        → Submitted
+      </span>
+    );
+  }
+
+  if (status === 'created') {
+    return (
+      <span className="inline-flex px-2 py-0.5 rounded
+                       bg-yellow-900/40 text-yellow-300 text-xs
+                       border border-yellow-600">
+        ⏳ Created
+      </span>
+    );
+  }
+
   return (
     <span className="inline-flex px-2 py-0.5 rounded
-                     bg-yellow-900/40 text-yellow-300 text-xs
-                     border border-yellow-600">
-      ⏳ Pending
+                     bg-slate-800/40 text-slate-300 text-xs
+                     border border-slate-600">
+      ? Unknown
     </span>
   );
 }

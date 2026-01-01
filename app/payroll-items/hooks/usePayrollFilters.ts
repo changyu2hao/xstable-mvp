@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { PayrollItem } from '../types';
 
-type StatusFilter = 'all' | 'pending' | 'paid' | 'failed';
+type StatusFilter = 'all' | 'created' | 'submitted' | 'paid' | 'failed';
 type SortKey = 'created_at' | 'amount_usdc' | 'employee_name';
 type SortDir = 'asc' | 'desc';
 

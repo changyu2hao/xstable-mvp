@@ -7,14 +7,14 @@ import React from 'react';
 interface Props {
     item: PayrollItem;
     isUpdating: boolean;
-    onMarkPaid: (id: string) => void;
+    onCheckStatus: (id: string) => void;   // ✅ rename
     onCopy: (text: string, label: string) => void;
 }
 
 function PayrollRow({
     item,
     isUpdating,
-    onMarkPaid,
+    onCheckStatus,
     onCopy,
 }: Props) {
     const rel = item.employees;
@@ -40,26 +40,38 @@ function PayrollRow({
             <td className="px-3 py-2 text-right text-slate-300">{item.amount_usdc}</td>
 
             <td className="px-3 py-2">
-                {item.status === 'pending' ? (
-                    <div className="flex gap-2">
-                        <StatusBadge status={item.status} />
-                        <button
-                            onClick={() => onMarkPaid(item.id)}
-                            disabled={isUpdating}
-                            className="text-xs border px-2 rounded text-blue-100"
-                        >
-                            Mark as paid
-                        </button>
-                    </div>
-                ) : (
+                <div className="flex items-center gap-2">
                     <StatusBadge status={item.status} />
-                )}
+
+                    {/* submitted + tx_hash => Check status */}
+                    {item.status === "submitted" && item.tx_hash ? (
+                        <button
+                            onClick={() => onCheckStatus(item.id)}
+                            disabled={isUpdating}
+                            className="text-xs border px-2 rounded text-blue-100 disabled:opacity-60"
+                        >
+                            Check status
+                        </button>
+                    ) : null}
+
+                    {/* created + no tx_hash => Not submitted */}
+                    {item.status === "created" && !item.tx_hash ? (
+                        <span className="text-xs text-amber-300">Not submitted</span>
+                    ) : null}
+
+                    {/* 可选：如果出现异常数据（比如 created 但有 tx_hash），给个提示 */}
+                    {item.status === "created" && item.tx_hash ? (
+                        <span className="text-xs text-amber-300">Has tx but not submitted</span>
+                    ) : null}
+                </div>
             </td>
+
+
             <td className="px-3 py-2 text-xs font-mono text-amber-200">
                 {item.tx_hash ? (
                     <span>
                         <a
-                            href={`https://basescan.org/tx/${item.tx_hash}`}
+                            href={`https://sepolia.basescan.org/tx/${item.tx_hash}`}
                             target="_blank"
                             rel="noreferrer"
                         >
