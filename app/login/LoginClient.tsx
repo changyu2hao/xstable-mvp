@@ -1,35 +1,34 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 const supabase = createSupabaseBrowserClient();
 
-export default function LoginClient({ redirectTo }: { redirectTo: string | null }) {
+export default function LoginClient() {
   const router = useRouter();
-  const next = redirectTo || "/company";
+  const sp = useSearchParams();
+
+  const next = sp.get("next") || sp.get("redirectTo") || "/company";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [msg, setMsg] = useState<string>("");
+  const [msg, setMsg] = useState("");
 
-  async function handleLogin(e: React.FormEvent) {
+async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setMsg("");
 
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-
     if (error) return setMsg(error.message);
 
     if (data.user) {
       router.replace(next);
       router.refresh();
-    } else {
-      setMsg("Login failed: no user returned.");
     }
   }
-
+  
   async function handleLogout() {
     await supabase.auth.signOut();
     setMsg("Signed out.");
