@@ -15,8 +15,8 @@ import PayrollTable from './components/PayrollTable';
 
 export default function PayrollItemsClient() {
   const searchParams = useSearchParams();
-  const batchId = searchParams.get('batchId');
-  const companyId = searchParams.get('companyId');
+  const batchId = searchParams?.get('batchId');
+  const companyId = searchParams?.get('companyId');
 
   const [toast, setToast] = useState<string | null>(null);
 
@@ -30,7 +30,7 @@ export default function PayrollItemsClient() {
           Missing <code>batchId</code> in URL.
         </p>
         <p className="text-xs text-slate-400">
-          Current search params: {searchParams.toString() || '(empty)'}
+          Current search params: {searchParams?.toString() || '(empty)'}
         </p>
       </div>
     );
@@ -46,6 +46,8 @@ export default function PayrollItemsClient() {
     updatingAll,
     createItem,
     checkStatus,
+    payItem,
+    updatingId,
     confirmAllSubmitted,
   } = usePayrollItems({
     batchId,
@@ -235,7 +237,9 @@ export default function PayrollItemsClient() {
         toggleSort={toggleSort}
         onCheckStatus={checkStatus}
         onCopy={copyToClipboard}
+        onPay={payItem}
         creating={creating}
+        updatingId={updatingId}
       />
       {/* ⭐ Toast：放在最外层 div 的最后 */}
       <Toast message={toast} />

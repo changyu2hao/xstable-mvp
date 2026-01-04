@@ -1,4 +1,3 @@
-import { ethers } from "ethers";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
@@ -133,6 +132,8 @@ const USDC_ABI = [
  * POST /api/admin/payroll-items
  * body: { batchId: string, employeeId: string, amountUsdc: number }
  */
+// ...keep your existing imports + supabaseServer() + isUuid()
+
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
@@ -141,9 +142,7 @@ export async function POST(req: Request) {
 
     // 1) must be logged in
     const { data: u, error: uErr } = await supabase.auth.getUser();
-    if (uErr || !u?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    if (uErr || !u?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     // 2) parse body
     const body = await req.json().catch(() => null);
@@ -152,10 +151,7 @@ export async function POST(req: Request) {
     const amountUsdc = body?.amountUsdc;
 
     if (!batchId || !employeeId || amountUsdc == null) {
-      return NextResponse.json(
-        { error: "Missing batchId / employeeId / amountUsdc" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Missing batchId / employeeId / amountUsdc" }, { status: 400 });
     }
     if (!isUuid(batchId) || !isUuid(employeeId)) {
       return NextResponse.json({ error: "Invalid UUID" }, { status: 400 });
@@ -172,10 +168,7 @@ export async function POST(req: Request) {
       .select("id, company_id")
       .eq("id", batchId)
       .single();
-
-    if (bErr || !batch) {
-      return NextResponse.json({ error: "Batch not found" }, { status: 404 });
-    }
+    if (bErr || !batch) return NextResponse.json({ error: "Batch not found" }, { status: 404 });
 
     // 4) verify owner of company
     const { data: company, error: cErr } = await supabase
@@ -184,63 +177,34 @@ export async function POST(req: Request) {
       .eq("id", batch.company_id)
       .eq("owner_user_id", u.user.id)
       .maybeSingle();
+    if (cErr || !company) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-    if (cErr || !company) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
-    // 5) verify employee belongs to same company + has wallet
+    // 5) verify employee belongs to same company
     const { data: emp, error: eErr } = await supabase
       .from("employees")
-      .select("id, company_id, name, email, wallet_address")
+      .select("id, company_id, wallet_address")
       .eq("id", employeeId)
       .single();
-
-    if (eErr || !emp) {
-      return NextResponse.json({ error: "Employee not found" }, { status: 404 });
-    }
+    if (eErr || !emp) return NextResponse.json({ error: "Employee not found" }, { status: 404 });
     if (emp.company_id !== batch.company_id) {
-      return NextResponse.json(
-        { error: "Employee does not belong to this company" },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: "Employee does not belong to this company" }, { status: 403 });
     }
 
-    const to = (emp.wallet_address ?? "").trim();
-    if (!to || !to.startsWith("0x") || to.length !== 42) {
-      return NextResponse.json(
-        { error: "Invalid employee wallet_address", wallet_address: to },
-        { status: 400 }
-      );
-    }
-
-    // 6) insert payroll item first
+    // 6) insert payroll item ONLY (no chain)
     const { data: inserted, error: insErr } = await supabase
       .from("payroll_items")
       .insert({
         batch_id: batchId,
         employee_id: employeeId,
         amount_usdc: amountNumber,
-        status: "created", // 先 created
-        paid_at: null,
+        status: "created",
         tx_hash: null,
+        paid_at: null,
       })
       .select(
         `
-        id,
-        batch_id,
-        employee_id,
-        amount_usdc,
-        status,
-        tx_hash,
-        created_at,
-        paid_at,
-        employees:employee_id (
-          id,
-          name,
-          email,
-          wallet_address
-        )
+        id, batch_id, employee_id, amount_usdc, status, tx_hash, created_at, paid_at,
+        employees:employee_id ( id, name, email, wallet_address )
       `
       )
       .single();
@@ -249,81 +213,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: insErr?.message ?? "Insert failed" }, { status: 500 });
     }
 
-    // =============================
-    // 7) auto-pay on-chain (server)
-    // =============================
-    const rpcUrl = process.env.BASE_SEPOLIA_RPC_URL;
-    const pk = process.env.PAYROLL_SENDER_PRIVATE_KEY;
-    const usdcAddress = process.env.BASE_SEPOLIA_USDC_ADDRESS;
-    if (!rpcUrl || !pk || !usdcAddress) {
-      await supabase.from("payroll_items").update({ status: "failed" }).eq("id", inserted.id);
-      return NextResponse.json({ error: "Missing env for chain payment" }, { status: 500 });
-    }
-
-    const provider = new ethers.JsonRpcProvider(rpcUrl);
-    const wallet = new ethers.Wallet(pk, provider);
-    const sender = await wallet.getAddress();
-    const usdc = new ethers.Contract(usdcAddress, USDC_ABI, wallet);
-
-    // decimals 在 v6 可能是 bigint/number —— 统一转 number
-    const decimals = Number(await usdc.decimals());
-
-    const human = String(amountNumber);
-    const onchainAmount = ethers.parseUnits(human, decimals);
-
-    // balance check
-    const bal = await usdc.balanceOf(sender); // bigint
-    if (bal < onchainAmount) {
-      await supabase.from("payroll_items").update({ status: "failed" }).eq("id", inserted.id);
-      return NextResponse.json(
-        {
-          error: "Insufficient USDC balance in sender wallet",
-          itemId: inserted.id,
-          sender,
-          senderBalance: ethers.formatUnits(bal, decimals), // string ✅ JSON safe
-          needed: human,
-        },
-        { status: 400 }
-      );
-    }
-
-    try {
-      // send tx
-      const tx = await usdc.transfer(to, onchainAmount);
-
-      // ✅ 只保存 tx_hash
-      await supabase
-        .from("payroll_items")
-        .update({
-          tx_hash: tx.hash,
-          status: "submitted",
-          paid_at: null,
-        })
-        .eq("id", inserted.id);
-
-      // ✅ 立刻返回（不等确认）
-      return NextResponse.json(
-        { ok: true, itemId: inserted.id, txHash: tx.hash, status: "submitted" },
-        { status: 201 }
-      );
-    } catch (e: any) {
-      await supabase.from("payroll_items").update({ status: "failed" }).eq("id", inserted.id);
-
-      return NextResponse.json(
-        {
-          error: "Transfer failed",
-          itemId: inserted.id,
-          message: String(e?.shortMessage ?? e?.message ?? e),
-          code: e?.code ? String(e.code) : null,
-          reason: e?.reason ? String(e.reason) : null,
-        },
-        { status: 500 }
-      );
-    }
+    return NextResponse.json({ ok: true, item: inserted }, { status: 201 });
   } catch (e: any) {
-    return NextResponse.json(
-      { error: "Failed to create payroll item", detail: String(e?.message ?? e) },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to create payroll item", detail: String(e?.message ?? e) }, { status: 500 });
   }
 }

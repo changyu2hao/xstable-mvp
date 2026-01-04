@@ -1,0 +1,20 @@
+name: Confirm Payroll Items
+
+on:
+  schedule:
+    - cron: "*/5 * * * *" # 每 5 分钟
+  workflow_dispatch: {}
+
+jobs:
+  confirm:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Call confirm payroll cron
+        run: |
+          curl -X POST "$CRON_URL" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Content-Type: application/json"
+        env:
+          CRON_URL: ${{ secrets.CRON_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
