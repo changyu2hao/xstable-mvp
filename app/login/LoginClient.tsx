@@ -1,3 +1,4 @@
+// app/login/LoginClient.tsx
 "use client";
 
 import { useState } from "react";
@@ -10,25 +11,35 @@ export default function LoginClient() {
   const router = useRouter();
   const sp = useSearchParams();
 
-  const next = sp.get("next") || sp.get("redirectTo") || "/company";
+  const next =
+    sp?.get("next") ||
+    sp?.get("redirectTo") ||
+    "/company";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [msg, setMsg] = useState("");
 
-async function handleLogin(e: React.FormEvent) {
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setMsg("");
 
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return setMsg(error.message);
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      setMsg(error.message);
+      return;
+    }
 
     if (data.user) {
       router.replace(next);
       router.refresh();
     }
   }
-  
+
   async function handleLogout() {
     await supabase.auth.signOut();
     setMsg("Signed out.");
@@ -41,7 +52,9 @@ async function handleLogin(e: React.FormEvent) {
 
         <form onSubmit={handleLogin} className="mt-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-300">Email</label>
+            <label className="block text-sm font-medium text-slate-300">
+              Email
+            </label>
             <input
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -53,7 +66,9 @@ async function handleLogin(e: React.FormEvent) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-300">Password</label>
+            <label className="block text-sm font-medium text-slate-300">
+              Password
+            </label>
             <input
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -66,7 +81,10 @@ async function handleLogin(e: React.FormEvent) {
 
           {msg && <p className="text-sm text-rose-400">{msg}</p>}
 
-          <button type="submit" className="w-full rounded-md bg-indigo-600 py-2 text-sm font-medium text-white">
+          <button
+            type="submit"
+            className="w-full rounded-md bg-indigo-600 py-2 text-sm font-medium text-white"
+          >
             Sign in
           </button>
 
@@ -81,7 +99,9 @@ async function handleLogin(e: React.FormEvent) {
 
         <p className="mt-6 text-xs text-slate-500">
           After login, you will be redirected to{" "}
-          <code className="rounded bg-slate-800 px-1 py-0.5 text-slate-300">{next}</code>
+          <code className="rounded bg-slate-800 px-1 py-0.5 text-slate-300">
+            {next}
+          </code>
         </p>
       </div>
     </div>
