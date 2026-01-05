@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/confirm-payroll-items",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}
