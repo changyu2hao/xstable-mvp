@@ -58,6 +58,19 @@ export async function POST(req: Request) {
     if (!isAuthorized(req)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const ua = req.headers.get("user-agent") ?? "unknown";
+    const hasAuth = Boolean(req.headers.get("authorization"));
+    const now = new Date().toISOString();
+
+    // 只打一次结构化 log，后面好筛选
+    console.log(JSON.stringify({
+      tag: "cron_confirm_payroll_items",
+      now,
+      ua: ua.slice(0, 120),   // 防止超长 UA
+      hasAuth,
+      env: process.env.VERCEL_ENV ?? "local",
+    }));
+
 
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
