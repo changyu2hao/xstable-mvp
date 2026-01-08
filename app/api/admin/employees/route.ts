@@ -41,7 +41,7 @@ export async function GET(req: Request) {
         // 4) fetch employees
         const { data: employees, error: eErr } = await supabase
             .from("employees")
-            .select("id, name, email, wallet_address, created_at")
+            .select("id, name, email, wallet_address, created_at,invite_token,invite_expires_at,user_id")
             .eq("company_id", companyId)
             .order("created_at", { ascending: false });
 

@@ -7,7 +7,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 const supabase = createSupabaseBrowserClient();
 
 export default function LogoutButton({
-  className = "rounded border border-slate-700 px-3 py-2 text-xs font-medium text-slate-300 hover:bg-slate-800",
+  className = "rounded border border-rose-500/40 px-3 py-2 text-xs font-medium text-rose-400 hover:bg-rose-500/10",
   label = "Log out",
 }: {
   className?: string;

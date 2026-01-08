@@ -43,9 +43,10 @@ export async function GET(req: Request) {
     // 3) employees
     const { data: employees, error: eErr } = await supabase
       .from("employees")
-      .select("id, company_id, name, email, wallet_address, created_at")
+      .select("id, company_id, name, email, wallet_address, created_at, invite_token, invite_expires_at, user_id")
       .eq("company_id", companyId)
       .order("created_at", { ascending: false });
+
 
     if (eErr) {
       return NextResponse.json({ error: eErr.message }, { status: 500 });

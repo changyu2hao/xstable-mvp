@@ -107,7 +107,14 @@ export default function MePayrollClient() {
                             ) : null}
                         </div>
 
-                        <div className="shrink-0">
+                        <div className="shrink-0 flex items-center gap-2">
+                            <Link
+                                href="/company"
+                                className="inline-flex items-center rounded-md bg-slate-800 px-3 py-2 text-xs font-medium text-white hover:bg-slate-700"
+                            >
+                                Go to company dashboard
+                            </Link>
+
                             <LogoutButton />
                         </div>
                     </div>

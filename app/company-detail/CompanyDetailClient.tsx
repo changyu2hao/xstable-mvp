@@ -16,7 +16,13 @@ interface Employee {
   name: string;
   email: string | null;
   wallet_address: string;
+
+  invite_token: string | null;
+  invite_expires_at: string | null;
+  user_id: string | null;
+  created_at?: string; // 你 API 也返回了 created_at，可选
 }
+
 
 export default function CompanyDetailClient({ companyId }: { companyId: string | null }) {
   const [company, setCompany] = useState<Company | null>(null);
@@ -27,7 +33,8 @@ export default function CompanyDetailClient({ companyId }: { companyId: string |
   const [batchStats, setBatchStats] = useState<
     Record<string, { itemCount: number; totalAmount: number }>
   >({});
-
+  const [openInviteFor, setOpenInviteFor] = useState<string | null>(null);
+  const [copiedFor, setCopiedFor] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -151,23 +158,132 @@ export default function CompanyDetailClient({ companyId }: { companyId: string |
       <div className="space-y-2">
         <h2 className="text-lg font-semibold">Employees</h2>
         {employees.length > 0 ? (
-          employees.map((emp) => (
-            <div
-              key={emp.id}
-              className="rounded border border-slate-700 bg-slate-800 p-3"
-            >
-              <p className="font-medium text-slate-300">{emp.name}</p>
-              <p className="text-sm text-slate-300">
-                {emp.email || 'No email'}
-              </p>
-              <p className="text-xs text-slate-400">
-                Wallet: {emp.wallet_address}
-              </p>
-            </div>
-          ))
+          employees.map((emp) => {
+            const isClaimed = !!emp.user_id;
+            const hasToken = !!emp.invite_token;
+
+            const isExpired =
+              emp.invite_expires_at
+                ? new Date(emp.invite_expires_at) < new Date()
+                : false;
+
+            const inviteLink =
+              emp.invite_token
+                ? `${window.location.origin}/claim?token=${emp.invite_token}`
+                : "";
+
+            const isOpen = openInviteFor === emp.id;
+
+            return (
+              <div
+                key={emp.id}
+                className="rounded border border-slate-700 bg-slate-800 p-3"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-medium text-slate-300">{emp.name}</p>
+                    <p className="text-sm text-slate-300">
+                      {emp.email || "No email"}
+                    </p>
+                    <p className="text-xs text-slate-400">
+                      Wallet: {emp.wallet_address}
+                    </p>
+
+                    {/* 状态显示 */}
+                    <p className="mt-1 text-xs">
+                      {isClaimed ? (
+                        <span className="text-emerald-400">Claimed</span>
+                      ) : isExpired ? (
+                        <span className="text-rose-400">Invite expired</span>
+                      ) : (
+                        <span className="text-slate-400">Not claimed</span>
+                      )}
+                    </p>
+                  </div>
+
+                  {/* 右侧按钮 */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={!hasToken || isClaimed}
+                      onClick={() => setOpenInviteFor(isOpen ? null : emp.id)}
+                      className="rounded bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+                      title={
+                        isClaimed
+                          ? "Already claimed"
+                          : !hasToken
+                            ? "No invite token"
+                            : "Show invite link"
+                      }
+                    >
+                      {isOpen ? "Hide" : "Invite link"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* 展开区域：Invite link + Copy + Open */}
+                {isOpen && !isClaimed && hasToken && (
+                  <div className="mt-3 space-y-2 rounded-lg border border-slate-700 bg-slate-950 p-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm text-slate-300">
+                        Invite link{" "}
+                        {isExpired ? (
+                          <span className="text-rose-400">(expired)</span>
+                        ) : (
+                          <span className="text-emerald-400">(valid)</span>
+                        )}
+                      </p>
+
+                      {emp.invite_expires_at && (
+                        <p className="text-xs text-slate-500">
+                          Expires: {new Date(emp.invite_expires_at).toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <input
+                        readOnly
+                        value={inviteLink}
+                        className="flex-1 rounded border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-100"
+                      />
+
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await navigator.clipboard.writeText(inviteLink);
+                          setCopiedFor(emp.id);
+                          setTimeout(() => setCopiedFor(null), 1200);
+                        }}
+                        className="rounded bg-indigo-600 px-3 py-2 text-xs font-medium text-white hover:bg-indigo-500"
+                      >
+                        {copiedFor === emp.id ? "Copied!" : "Copy"}
+                      </button>
+
+                      <a
+                        href={inviteLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="rounded bg-slate-800 px-3 py-2 text-xs font-medium text-white hover:bg-slate-700"
+                      >
+                        Open
+                      </a>
+                    </div>
+
+                    {isExpired && (
+                      <p className="text-xs text-rose-400">
+                        This invite link is expired. (MVP) You may need to recreate the employee invite.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })
         ) : (
           <p className="text-slate-400">No employees yet.</p>
         )}
+
       </div>
 
       {/* 发薪批次：创建表单 + 列表 */}

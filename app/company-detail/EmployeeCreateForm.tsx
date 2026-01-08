@@ -10,7 +10,7 @@ interface EmployeeCreateFormProps {
 }
 
 export default function EmployeeCreateForm({
-  companyId,onCreated
+  companyId, onCreated
 }: EmployeeCreateFormProps) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -67,7 +67,7 @@ export default function EmployeeCreateForm({
 
       setInviteLink(link);
       setCopied(false);
-      
+
       setName("");
       setEmail("");
       setWalletAddress("");
@@ -160,6 +160,14 @@ export default function EmployeeCreateForm({
             >
               {copied ? 'Copied!' : 'Copy'}
             </button>
+            <a
+              href={inviteLink}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded bg-slate-800 px-3 py-2 text-xs font-medium text-white hover:bg-slate-700"
+            >
+              Open
+            </a>
           </div>
         </div>
       )}

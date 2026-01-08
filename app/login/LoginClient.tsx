@@ -1,20 +1,18 @@
 // app/login/LoginClient.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
-
-const supabase = createSupabaseBrowserClient();
 
 export default function LoginClient() {
   const router = useRouter();
   const sp = useSearchParams();
 
-  const next =
-    sp?.get("next") ||
-    sp?.get("redirectTo") ||
-    "/company";
+  // ✅ 建议：client supabase 放组件内（更稳）
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+
+  const next = sp?.get("next") || sp?.get("redirectTo") || "/";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -35,14 +33,9 @@ export default function LoginClient() {
     }
 
     if (data.user) {
-      router.replace(next);
+      router.replace("/");
       router.refresh();
     }
-  }
-
-  async function handleLogout() {
-    await supabase.auth.signOut();
-    setMsg("Signed out.");
   }
 
   return (
@@ -87,17 +80,21 @@ export default function LoginClient() {
           >
             Sign in
           </button>
-
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="w-full rounded-md border border-slate-700 py-2 text-sm font-medium text-slate-300"
-          >
-            Sign out
-          </button>
         </form>
 
-        <p className="mt-6 text-xs text-slate-500">
+        {/* ✅ 新增：Sign up 链接（透传 next） */}
+        <div className="mt-5 text-sm text-slate-300">
+          Don&apos;t have an account?{" "}
+          <a
+            className="text-indigo-400 underline hover:text-indigo-300"
+            href="/sign-up"
+          >
+            Sign up
+          </a>
+
+        </div>
+
+        <p className="mt-4 text-xs text-slate-500">
           After login, you will be redirected to{" "}
           <code className="rounded bg-slate-800 px-1 py-0.5 text-slate-300">
             {next}

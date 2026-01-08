@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import CompanyCreateForm from "./CompanyCreateForm";
+import LogoutButton from "@/components/LogoutButton";
+
 
 type Company = {
   id: string;
@@ -45,9 +47,32 @@ export default function CompanyDashboardClient() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Company Portal</h1>
-      <p className="text-black-300">Companies registered in the system (MVP demo):</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold">Company Portal</h1>
 
+          {data.length === 0 ? (
+            <p className="mt-1 text-sm text-black">
+              Welcome! To get started, create your first company.
+            </p>
+          ) : (
+            <p className="mt-1 text-sm text-black">
+              Select a company to manage payroll, or create a new one.
+            </p>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Link
+            href="/me/payroll"
+            className="inline-flex items-center rounded-md bg-slate-800 px-3 py-2 text-xs font-medium text-white hover:bg-slate-700"
+          >
+            View my payslips
+          </Link>
+
+          <LogoutButton />
+        </div>
+      </div>
       <CompanyCreateForm onCreated={refetchCompanies} />
 
       {errorMsg ? (
@@ -73,7 +98,7 @@ export default function CompanyDashboardClient() {
             </Link>
           ))
         ) : (
-          <p className="text-slate-400">No companies found.</p>
+          <p className="text-red-600">No companies found.</p>
         )}
       </div>
     </div>

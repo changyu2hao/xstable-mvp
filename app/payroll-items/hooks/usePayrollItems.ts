@@ -156,23 +156,42 @@ export default function usePayrollItems({ batchId }: Args) {
     setError(null);
 
     try {
-      const toConfirm = items.filter(i => i.status === "submitted" && i.tx_hash);
-
-      for (const it of toConfirm) {
-        await fetch(`/api/admin/payroll-items/${encodeURIComponent(it.id)}/confirm`, {
+      // ✅ 单次 call：由 server 批量确认（不会再 for-loop）
+      const res = await fetch(
+        `/api/admin/payroll-items/confirm-submitted?batchId=${encodeURIComponent(batchId)}`,
+        {
           method: "POST",
           credentials: "include",
-        });
+        }
+      );
+
+      const text = await res.text();
+      let json: any = null;
+      try { json = text ? JSON.parse(text) : null; } catch { }
+
+      // 只有真正客户端错误才会出现非 200（401/403/404/400）
+      if (!res.ok) {
+        setError(json?.error ?? json?.detail ?? text ?? "Failed to confirm submitted");
+        return;
       }
 
+      // 200 but ok:false + retryable:true => 软失败（不红字）
+      if (json?.ok === false && json?.retryable) {
+        console.warn("RPC busy, try again:", json?.detail ?? json);
+        return;
+      }
+
+      // ok:true：刷新数据
       await fetchData();
     } catch (e: any) {
       console.error(e);
-      setError(e?.message ?? "Failed to confirm all submitted");
+      // 软失败（你想红字就改成 setError）
+      setError(null);
     } finally {
       setUpdatingAll(false);
     }
-  }, [items, fetchData]);
+  }, [batchId, fetchData]);
+
 
   // inside usePayrollItems.ts
 
