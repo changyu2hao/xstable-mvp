@@ -143,45 +143,107 @@ To view on-chain payroll transactions, testers need:
 
 ---
 
-### 1) Install MetaMask
-1. Go to https://metamask.io
-2. Install the browser extension (Chrome / Edge)
+### Step 1: Install MetaMask
+
+If you already have MetaMask installed, you can skip this step.
+
+1. Go to 👉 https://metamask.io  
+2. Install the browser extension (Chrome / Edge / Firefox)
 3. Create a wallet
-4. Save your Secret Recovery Phrase somewhere safe
+4. **Securely save your recovery phrase**
+
+⚠️ **Important**
+- Use a **test wallet only**
+- Never use a wallet that holds real funds
+- Never share your recovery phrase or private key
 
 ---
 
-### 2) Add / Switch to Base Sepolia
-In MetaMask:
+### Step 2: Open the Network Selector (New MetaMask UI)
+
+MetaMask’s UI has changed — the network selector is now a modal.
+
 1. Open MetaMask
-2. Click the network dropdown (top center)
-3. Enable **“Show test networks”**
-4. Select **Base Sepolia**
+2. Click the **network indicator near your account name**  
+   _(this opens the “Select network” modal)_
+3. Enable **“Show test networks”** if it’s not already enabled
 
-If Base Sepolia is not listed, add manually:
-
-- **Network Name:** Base Sepolia  
-- **RPC URL:** https://sepolia.base.org  
-- **Chain ID:** 84532  
-- **Currency Symbol:** ETH  
-- **Block Explorer:** https://sepolia.basescan.org  
+You should now see a list of available networks.
 
 ---
 
-### 3) Get your wallet address (to receive payroll)
-1. Open MetaMask
-2. Click your account name
-3. Copy address (starts with `0x...`)
-4. Use this address as your employee wallet address
+### Step 3: Switch to Base Sepolia
+
+#### If Base Sepolia is already listed
+
+- It usually appears under **Custom networks**
+- Click **Base Sepolia** to switch
+
+✅ You’re done.
 
 ---
 
-### 4) View transactions in BaseScan
-Payroll tx hashes link to:
-- https://sepolia.basescan.org
+### Step 4: Manually Add Base Sepolia (If Not Listed)
+
+If Base Sepolia does **not** appear in the list:
+
+1. In the **Select network** modal, click **Add custom network**
+2. Enter the following details:
+
+Network Name: Base Sepolia
+RPC URL: https://sepolia.base.org
+
+Chain ID: 84532
+Currency Symbol: ETH
+Block Explorer: https://sepolia.basescan.org
+3. Save
+4. Switch to **Base Sepolia**
+
+---
+
+### Step 5: Get Your Wallet Address (Required to Receive Payroll)
+
+You must copy your **Base Sepolia address** so payroll can be sent to you.
+
+1. Make sure MetaMask is set to **Base Sepolia**
+2. Click **Receive**
+3. In the network list, find **Base Sepolia**
+4. Copy the address shown  
+   _(starts with `0x...`)_
+
+📌 This address is what you:
+- Paste into **Employee wallet address** in XStable
+- Use to receive **USDC payroll payments**
+
+> Your address format looks like Ethereum, but it is **network-specific**.
+
+---
+
+### Step 6: View Transactions
+
+All payroll transactions in XStable link directly to **BaseScan**:
+
+https://sepolia.basescan.org
 
 Example:
 - `https://sepolia.basescan.org/tx/<tx_hash>`
+
+yaml
+Copy code
+
+You can:
+- View transaction status
+- Confirm transfers
+- Inspect USDC movements
+
+---
+
+### ✅ Notes for Testers
+
+- All USDC in this demo is **testnet USDC**
+- All transactions are **non-real**
+- No wallet connection is required inside XStable  
+  _(payroll is initiated server-side)_
 
 ---
 
@@ -240,27 +302,225 @@ Open: https://faucet.circle.com/
 
 ## 🗂️ Project Structure (Simplified)
 
-app/
-login/ # sign in
-sign-up/ # sign up
-onboarding/ # role selection + invite entry
-company/ # admin dashboard
-company-detail/ # manage employees + batches
-me/payroll/ # employee portal
-payroll-items/ # admin payroll list
-api/
-admin/ # admin-only server APIs
-me/ # employee-only server APIs
-cron/ # confirmation (optional)
+app
+├─ login/ # sign in
+├─ sign-up/ # sign up
+├─ onboarding/ # role selection + invite entry
+├─ company/ # admin dashboard
+├─ company-detail/ # manage employees + payroll batches
+├─ me/
+│ └─ payroll/ # employee portal
+├─ payroll-items/ # admin payroll list
+└─ api/
+├─ admin/ # admin-only server APIs
+├─ me/ # employee-only server APIs
+└─ cron/ # confirmation jobs (optional)
 
-lib/supabase/
-browser.ts
-server.ts
-serverRoute.ts
+lib/
+└─ supabase/
+├─ browser.ts
+├─ server.ts
+└─ serverRoute.ts
 
 components/
-LogoutButton.tsx
+└─ LogoutButton.tsx
 
+---
+
+## ⏱️ Automated Payroll Confirmation (Cron)
+
+XStable uses a **production-grade cron job** to automatically confirm on-chain payroll transactions and update their status in the database.
+
+This ensures payroll items move from `submitted → paid / failed` **without any manual intervention**.
+
+* * *
+
+### ✅ Production Cron (GitHub Actions)
+
+A scheduled GitHub Actions workflow runs **every 10 minutes**.
+
+# .github/workflows/confirm-payroll.yml
+name: Confirm Payroll Items
+
+on:
+  schedule:
+    - cron: "*/10 * * * *" # every 10 minutes
+  workflow_dispatch: {}
+
+jobs:
+  confirm:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Call confirm payroll cron
+        run: |
+          curl -X POST "$CRON_URL" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Content-Type: application/json"
+        env:
+          CRON_URL: ${{ secrets.CRON_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+## 
+
+**Key properties:**
+
+-   Runs every **10 minutes**
+    
+-   Can be triggered manually (`workflow_dispatch`)
+    
+-   Calls a **server-only endpoint**
+    
+-   Authenticated via a **shared secret**
+    
+-   No client or public access
+    
+
+* * *
+
+### 🔐 Cron Authentication & Security
+
+## 
+
+The cron endpoint is **not public**.
+
+function isAuthorized(req: Request) {
+  const token = req.headers.get("authorization");
+  return token === `Bearer ${process.env.CRON_SECRET}`;
+}
+
+## 
+
+-   Requests **must** include `Authorization: Bearer <CRON_SECRET>`
+    
+-   Secret is stored securely in **GitHub Actions secrets**
+    
+-   Prevents abuse or external triggering
+    
+
+* * *
+
+### 🧠 On-chain Confirmation Logic
+
+## 
+
+**Endpoint:**
+
+POST /api/cron/confirm-payroll-items
+
+## 
+
+-   **Responsibilities:**
+    
+    -   Fetch all payroll items with:
+        
+        -   `status = submitted`
+            
+        -   `tx_hash IS NOT NULL`
+            
+    -   Query the **Base Sepolia blockchain** using `ethers.js`
+        
+    -   Handle all transaction states:
+        
+        -   ⏳ not mined yet
+            
+        -   ❌ reverted (failed)
+            
+        -   ✅ confirmed (paid)
+            
+    
+    * * *
+    
+
+### 🔄 Status Transitions
+
+## 
+
+-   | Blockchain Result | Database Update |
+    | --- | --- |
+    | Not mined | No change (retry later) |
+    | Reverted | `submitted → failed` |
+    | Successful | `submitted → paid` + `paid_at` |
+    
+    * * *
+    
+
+### 🧱 Reliability & Fault Tolerance
+
+## 
+
+-   The cron job is designed to be **safe and resilient**:
+    
+    -   **Timeout protection** on RPC calls
+        
+    -   **Retry with exponential backoff** for flaky RPC responses
+        
+    -   Detects and skips:
+        
+        -   invalid tx hashes
+            
+        -   claim-only records
+            
+    -   **Idempotent**:
+        
+        -   Safe to run repeatedly
+            
+        -   No duplicate side effects
+            
+    
+    * * *
+    
+
+### 📊 Structured Logging
+
+## 
+
+-   Each run emits a structured log entry:
+
+{
+  "tag": "cron_confirm_payroll_items",
+  "now": "2026-01-09T06:20:00.000Z",
+  "env": "production",
+  "hasAuth": true
+}
+
+## 
+
+-   Returned response includes counters such as:
+    
+    -   `checked`
+        
+    -   `updated`
+        
+    -   `minedPaid`
+        
+    -   `minedFailed`
+        
+    -   `notMined`
+        
+    -   `rpcBusy`
+        
+    
+    This makes debugging and monitoring straightforward.
+    
+    * * *
+    
+
+### 🏗️ Why This Matters
+
+## 
+
+-   This cron setup ensures:
+    
+    -   Payroll confirmation is **fully automated**
+        
+    -   Blockchain delays are handled gracefully
+        
+    -   The system remains **eventually consistent**
+        
+    -   No admin needs to manually “check transactions”
+        
+    
+    This is a **real backend system pattern**, not a demo hack.
 
 ---
 
