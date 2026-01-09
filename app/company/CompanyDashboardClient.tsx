@@ -17,17 +17,21 @@ type Company = {
 export default function CompanyDashboardClient() {
   const [data, setData] = useState<Company[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   async function refetchCompanies() {
+    setLoading(true);
     const res = await fetch("/api/admin/companies", { credentials: "include" });
     const text = await res.text();
     const json = text ? JSON.parse(text) : null;
     if (!res.ok) throw new Error(json?.error ?? `Failed (${res.status})`);
     setData(json.companies ?? []);
+    setLoading(false);
   }
 
   useEffect(() => {
     async function run() {
+      setLoading(true);
       setErrorMsg(null);
       const res = await fetch("/api/admin/companies", {
         credentials: "include",
@@ -37,9 +41,11 @@ export default function CompanyDashboardClient() {
       if (!res.ok) {
         setErrorMsg(json?.error ?? `Failed (${res.status})`);
         setData([]);
+        setLoading(false);
         return;
       }
       setData(json?.companies ?? []);
+      setLoading(false);
     }
     run();
   }, []);
@@ -80,9 +86,10 @@ export default function CompanyDashboardClient() {
           {errorMsg}
         </div>
       ) : null}
-
       <div className="space-y-2">
-        {data.length > 0 ? (
+        {loading ? (
+          <p className="text-red-500">Loading companies…</p>
+        ) : data.length > 0 ? (
           data.map((company) => (
             <Link
               key={company.id}
@@ -90,15 +97,19 @@ export default function CompanyDashboardClient() {
               className="block rounded border border-slate-700 bg-slate-800 p-4 hover:border-emerald-400"
             >
               <p className="text-lg font-medium text-slate-200">{company.name}</p>
-              <p className="text-sm text-slate-400">{company.owner_email || "No owner email"}</p>
+              <p className="text-sm text-slate-400">
+                {company.owner_email || "No owner email"}
+              </p>
               <p className="text-xs text-slate-500">
                 Created at:{" "}
-                {company.created_at ? new Date(company.created_at).toLocaleString() : "-"}
+                {company.created_at
+                  ? new Date(company.created_at).toLocaleString()
+                  : "-"}
               </p>
             </Link>
           ))
         ) : (
-          <p className="text-red-600">No companies found.</p>
+          <p className="text-red-500">No companies found.</p>
         )}
       </div>
     </div>

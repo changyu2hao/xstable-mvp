@@ -45,12 +45,28 @@ export default function MePayrollClient() {
     const [copiedTxId, setCopiedTxId] = useState<string | null>(null);
     const [employee, setEmployee] = useState<Employee | null>(null);
     const [items, setItems] = useState<PayrollItem[]>([]);
+    const [page, setPage] = useState(1);
     const router = useRouter();
 
 
     const displayName = useMemo(() => {
         return employee?.name || employee?.email || "Employee";
     }, [employee]);
+
+    // ✅ Pagination
+    const PAGE_SIZE = 10;
+    const total = items.length;
+    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    const paginatedItems = useMemo(() => {
+        const start = (page - 1) * PAGE_SIZE;
+        return items.slice(start, start + PAGE_SIZE);
+    }, [items, page]);
+
+    // ✅ items 变化后，回到第一页（比如刚刷新/排序/新数据）
+    useEffect(() => {
+        setPage(1);
+    }, [items]);
+
 
     useEffect(() => {
         async function run() {
@@ -130,7 +146,7 @@ export default function MePayrollClient() {
                 ) : (
                     <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
                         <div className="border-b border-slate-800 px-5 py-3 text-sm text-slate-300">
-                            {items.length} item(s)
+                            {paginatedItems.length} item(s) (of {items.length})
                         </div>
 
                         {items.length === 0 ? (
@@ -139,7 +155,7 @@ export default function MePayrollClient() {
                             </div>
                         ) : (
                             <div className="divide-y divide-slate-800">
-                                {items.map((it) => (
+                                {paginatedItems.map((it) => (
                                     <div key={it.id} className="px-5 py-4">
                                         <div className="flex items-start justify-between gap-4">
                                             <div className="min-w-0">
@@ -204,6 +220,45 @@ export default function MePayrollClient() {
                                 ))}
                             </div>
                         )}
+                        <div className="flex items-center justify-between border-t border-slate-800 px-5 py-3 text-xs text-slate-400">
+                            <div>
+                                Showing{" "}
+                                <span className="font-medium text-slate-200">
+                                    {total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}
+                                </span>
+                                –
+                                <span className="font-medium text-slate-200">
+                                    {Math.min(page * PAGE_SIZE, total)}
+                                </span>{" "}
+                                of{" "}
+                                <span className="font-medium text-slate-200">{total}</span>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <button
+                                    disabled={page === 1}
+                                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                                    className="rounded border border-slate-700 px-2 py-1 disabled:opacity-40 hover:bg-slate-800"
+                                >
+                                    Prev
+                                </button>
+
+                                <span>
+                                    Page{" "}
+                                    <span className="font-medium text-slate-200">{page}</span> /{" "}
+                                    <span className="font-medium text-slate-200">{totalPages}</span>
+                                </span>
+
+                                <button
+                                    disabled={page === totalPages}
+                                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                                    className="rounded border border-slate-700 px-2 py-1 disabled:opacity-40 hover:bg-slate-800"
+                                >
+                                    Next
+                                </button>
+                            </div>
+                        </div>
+
                     </div>
                 )}
             </div>

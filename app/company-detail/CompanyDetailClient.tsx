@@ -202,25 +202,26 @@ export default function CompanyDetailClient({ companyId }: { companyId: string |
                   </div>
 
                   {/* 右侧按钮 */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      disabled={!hasToken || isClaimed}
-                      onClick={() => setOpenInviteFor(isOpen ? null : emp.id)}
-                      className="rounded bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-700 disabled:opacity-50"
-                      title={
-                        isClaimed
-                          ? "Already claimed"
-                          : !hasToken
-                            ? "No invite token"
-                            : "Show invite link"
-                      }
-                    >
-                      {isOpen ? "Hide" : "Invite link"}
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    disabled={!hasToken || isClaimed}
+                    onClick={() => setOpenInviteFor(isOpen ? null : emp.id)}
+                    className="
+    rounded bg-slate-900 px-3 py-2 text-xs font-medium text-white
+    disabled:opacity-50
+    enabled:hover:bg-slate-700
+  "
+                    title={
+                      isClaimed
+                        ? "Already claimed"
+                        : !hasToken
+                          ? "No invite token"
+                          : "Show invite link"
+                    }
+                  >
+                    {isOpen ? "Hide" : "Invite link"}
+                  </button>
                 </div>
-
                 {/* 展开区域：Invite link + Copy + Open */}
                 {isOpen && !isClaimed && hasToken && (
                   <div className="mt-3 space-y-2 rounded-lg border border-slate-700 bg-slate-950 p-3">
