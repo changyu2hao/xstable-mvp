@@ -302,28 +302,26 @@ Open: https://faucet.circle.com/
 
 ## 🗂️ Project Structure (Simplified)
 
-app
-├─ login/ # sign in
-├─ sign-up/ # sign up
-├─ onboarding/ # role selection + invite entry
-├─ company/ # admin dashboard
-├─ company-detail/ # manage employees + payroll batches
-├─ me/
-│ └─ payroll/ # employee portal
-├─ payroll-items/ # admin payroll list
-└─ api/
-├─ admin/ # admin-only server APIs
-├─ me/ # employee-only server APIs
-└─ cron/ # confirmation jobs (optional)
-
-lib/
-└─ supabase/
-├─ browser.ts
-├─ server.ts
-└─ serverRoute.ts
-
-components/
-└─ LogoutButton.tsx
+- app/
+  - login/                # sign in
+  - sign-up/              # sign up
+  - onboarding/           # role selection + invite entry
+  - company/              # admin dashboard
+  - company-detail/       # manage employees + payroll batches
+  - me/
+    - payroll/            # employee portal
+  - payroll-items/        # admin payroll list
+  - api/
+    - admin/              # admin-only server APIs
+    - me/                 # employee-only server APIs
+    - cron/               # confirmation jobs (optional)
+- lib/
+  - supabase/
+    - browser.ts
+    - server.ts
+    - serverRoute.ts
+- components/
+  - LogoutButton.tsx
 
 ---
 
@@ -385,14 +383,6 @@ POST /api/cron/confirm-payroll-items
             
         -   ✅ confirmed (paid)
     
-
-### ✅ Status Transitions
-
-    | Blockchain Result | Database Update |
-    | --- | --- |
-    | Not mined | No change (retry later) |
-    | Reverted | `submitted → failed` |
-    | Successful | `submitted → paid` + `paid_at` | 
 
 ### ✅ Reliability & Fault Tolerance
 
