@@ -1,63 +1,89 @@
 # XStable Payroll (MVP)
 
-XStable Payroll is a **server-first payroll MVP** designed to explore **secure, production-grade payroll architecture**, with a clear upgrade path toward **USDC / on-chain payroll execution**.
+**XStable Payroll** is a payroll MVP designed to explore **secure, server-first payroll workflows** using **Next.js App Router + Supabase**, with an MVP-grade path toward **USDC / on-chain payroll** (Base Sepolia).
 
-This repository reflects the project **completed through Phase 3 (On-chain Confirmation & Production Cron)**.
-
-The primary focus of this MVP is **correct architecture, security boundaries, and real-world backend patterns**, not UI polish.
+Live demo: https://xstable-mvp.vercel.app
 
 ---
 
 ## 🚀 Tech Stack
 
-### Frontend / App
-- Next.js (App Router)
-- React (Server & Client Components)
-- TypeScript
-- Tailwind CSS
+### Frontend
+- **Next.js** (App Router)
+- **React** (Server + Client Components)
+- **TypeScript**
+- **Tailwind CSS**
 
 ### Backend / Infra
-- Supabase (Auth, Postgres, RLS)
-- Supabase SSR (`@supabase/ssr`)
-- Row Level Security (RLS)
-- GitHub Actions (Production Cron)
+- **Supabase** (Auth + Postgres + RLS)
+- **@supabase/ssr** (server sessions, cookies)
 
-### Blockchain
-- ethers.js
-- Base Sepolia (testnet)
-
-### Documents
-- `pdf-lib` (server-only PDF generation)
+### Blockchain (Testnet)
+- **Base Sepolia**
+- **USDC (test token)**
+- **ethers.js** (server-side signing / confirmation)
 
 ---
 
 ## 🎯 Project Goals
 
-- Build a **realistic payroll system**, not a demo UI
-- Enforce **strict permission boundaries** (admin vs employee)
-- Ensure **all sensitive operations are server-only**
-- Treat **RLS as the final authority**, not frontend logic
-- Design a **Web3-ready payroll pipeline** with clear separation between:
-  - transaction execution
-  - transaction confirmation
+- Build a **realistic payroll MVP**, not just a UI demo
+- Enforce strict **permission boundaries** (admin vs employee)
+- Keep all sensitive logic **server-only**
+- Demonstrate a path to **Web3 payroll** (USDC transfer + explorer links)
 
 ---
 
-## 📦 Core Features (Implemented)
+## 👥 Roles & Access Model
+
+### ✅ Admin (Company Owner)
+Admins are users who have a company where:
+- `companies.owner_user_id = auth.uid()`
+
+Admins can:
+- Create companies
+- Add employees (generate invite tokens)
+- Create payroll batches & payroll items
+- Trigger USDC payouts (server-side)
+
+---
+
+### ✅ Employee
+Employees are users who are linked to an employee record where:
+- `employees.user_id = auth.uid()`
+
+Employees can:
+- Claim invitation via invite token
+- View `/me/payroll`
+- View individual payslip details
+- View transactions in BaseScan
+
+---
+
+### ✅ Unlinked user
+A signed-up user with **no company ownership** and **no employee binding**.
+
+They are redirected to:
+- `/onboarding`
+
+---
+
+## ✅ Core Features (Current)
 
 ### ✅ Authentication
-- Email / password login & logout
-- Persistent sessions via Supabase Auth
-- SSR-compatible auth handling using middleware
+- Email/password **Sign up / Sign in / Log out**
+- SSR-compatible session handling
+- Clean redirects based on role
 
 ---
 
-### ✅ Company & Employee Model
-- Companies with explicit `owner_user_id`
-- Employees belong to a company
-- Employee onboarding via **invite token**
-- Claim flow implemented using **Supabase RPC (SECURITY DEFINER)**  
-  → prevents client-side privilege escalation
+### ✅ Company & Employee
+- Companies owned by `owner_user_id`
+- Employees belong to company
+- Invite token onboarding:
+  - `invite_token`
+  - `invite_expires_at`
+  - `user_id` (link employee after claim)
 
 ---
 
@@ -65,199 +91,200 @@ The primary focus of this MVP is **correct architecture, security boundaries, an
 - Payroll batches & payroll items
 - Status lifecycle:
   - `pending`
-  - `submitted`
   - `paid`
   - `failed`
-- Strong database constraints  
-  (e.g. `paid_at` required when status = `paid`)
-
----
-
-### ✅ Admin Payroll APIs (Server-only)
-All payroll mutations are **server-only** and live under `/api/admin/*`.
-
-Implemented endpoints include:
-- `/api/admin/payroll-items`
-- `/api/admin/payroll-items/[id]`
-- `/api/admin/payroll-items/mark-all-paid`
-- `/api/admin/payroll-batches`
-
-Frontend **cannot** directly mutate payroll data via Supabase client.
+- Tx hash stored on payroll item
+- Explorer links in UI
 
 ---
 
 ### ✅ Employee Portal
-- `/me/payroll` — employee payroll list
-- `/me/payroll/[id]` — payslip detail page
-- Employees can **only access their own payroll records**
-- Ownership enforced both:
-  - server-side
-  - via RLS policies
+Employee pages:
+- `/me/payroll` (paginated list)
+- `/me/payroll/[id]` (detail)
+- `/api/me/payroll/[id]/pdf` (server-only PDF export)
 
 ---
 
-### ✅ Server-only Payslip PDF Export
-- Secure endpoint: `/api/me/payroll/[id]/pdf`
-- Server-side authentication & ownership validation
-- PDF generated on the server using `pdf-lib`
-- Binary response with zero client-side trust
+### ✅ Server-only Payslip PDF
+Server-only PDF generation:
+- Uses **pdf-lib**
+- Validates:
+  - logged-in user
+  - employee ownership
+- Returns binary PDF response
 
 ---
 
-## 🔗 Phase 3 — On-chain Payroll Confirmation (Completed)
-
-### ✅ Blockchain Transaction Tracking
-- Payroll items store `tx_hash` after on-chain execution
-- Transaction lifecycle is **decoupled** from UI actions
-
----
-
-### ✅ Production Cron (GitHub Actions)
-A production-grade cron job runs every 10 minutes via **GitHub Actions**:
-
-- Workflow: `.github/workflows/confirm-payroll.yml`
-- Calls a **protected server-only endpoint**
-- Authenticated via `CRON_SECRET`
-- No client or public access
-
----
-
-### ✅ On-chain Confirmation Logic
-Server-only cron endpoint:
-
-POST /api/cron/confirm-payroll-items
-
-
-Responsibilities:
-- Fetch all `submitted` payroll items with `tx_hash`
-- Query blockchain via `ethers.js`
-- Handle:
-  - pending transactions
-  - reverted transactions
-  - successful transactions
-- Update database status:
-  - `submitted → paid`
-  - `submitted → failed`
-- Designed to be:
-  - idempotent
-  - retry-safe
-  - resilient to RPC flakiness
-
-> ⚠️ This cron **does NOT send transactions**.  
-> It only **confirms and reconciles blockchain state**.
-
----
-
-## 🔐 Security Model
-
-### Row Level Security (Enabled)
+### ✅ Security: Row Level Security (RLS)
 RLS is enabled on:
 - `companies`
 - `employees`
 - `payroll_batches`
 - `payroll_items`
 
-Policies enforce:
-- Company owners can only manage **their own data**
-- Employees can only read **their own payroll items**
-- Client-side Supabase access is **non-authoritative**
-- Critical mutations happen via:
-  - server APIs
-  - or SECURITY DEFINER RPCs
+Policies ensure:
+- Admin can only access their own companies via `owner_user_id`
+- Employees can only access their own records via `employees.user_id`
+- Sensitive mutations are not trusted in the browser
 
 ---
 
-### Cron Security
-- Cron endpoint is **not publicly accessible**
-- Requires `Authorization: Bearer CRON_SECRET`
-- Secrets are stored only in:
-  - GitHub Actions
-  - Vercel environment variables
+## 🦊 MetaMask & Base Sepolia (Demo Guide)
+
+### ✅ Why MetaMask is needed
+To view on-chain payroll transactions, testers need:
+- a wallet address
+- Base Sepolia network enabled
+- BaseScan explorer links work directly from tx hashes
+
+> **Important:** Testers do **NOT** need to send USDC themselves.  
+> Payroll is sent from the project’s server-controlled payroll wallet.
+
+---
+
+### 1) Install MetaMask
+1. Go to https://metamask.io
+2. Install the browser extension (Chrome / Edge)
+3. Create a wallet
+4. Save your Secret Recovery Phrase somewhere safe
+
+---
+
+### 2) Add / Switch to Base Sepolia
+In MetaMask:
+1. Open MetaMask
+2. Click the network dropdown (top center)
+3. Enable **“Show test networks”**
+4. Select **Base Sepolia**
+
+If Base Sepolia is not listed, add manually:
+
+- **Network Name:** Base Sepolia  
+- **RPC URL:** https://sepolia.base.org  
+- **Chain ID:** 84532  
+- **Currency Symbol:** ETH  
+- **Block Explorer:** https://sepolia.basescan.org  
+
+---
+
+### 3) Get your wallet address (to receive payroll)
+1. Open MetaMask
+2. Click your account name
+3. Copy address (starts with `0x...`)
+4. Use this address as your employee wallet address
+
+---
+
+### 4) View transactions in BaseScan
+Payroll tx hashes link to:
+- https://sepolia.basescan.org
+
+Example:
+- `https://sepolia.basescan.org/tx/<tx_hash>`
+
+---
+
+## ✅ Can other testers mint USDC easily?
+Yes — **any tester** can mint Base Sepolia **test USDC** using Circle’s faucet:
+- https://faucet.circle.com/
+
+But in this MVP, they **don’t need to**, because:
+- payroll sends USDC from the server payroll wallet
+- employees only need a receiving address
+
+---
+
+## 🔐 On-chain Payroll Sender (How it works in this MVP)
+
+### ✅ Important behavior
+All USDC transfers are sent from **ONE wallet**:
+- the server-controlled wallet configured via env vars
+
+That means:
+- No matter who the employee is, the sender address is the same
+- This matches real payroll systems (a single payroll operator wallet)
+
+### ✅ Why this is correct for MVP
+- simpler for demo
+- avoids requiring every company/admin to manage keys
+- avoids security risk of putting private keys in client apps
+
+---
+
+## ⚠️ Developer Notes (Optional)
+
+### ✅ USDC Contract (Base Sepolia)
+This project uses Base Sepolia USDC contract:
+- `0x036CbD53842c5426634e7929541eC2318f3dCF7e`
+
+---
+
+### ✅ Funding the payroll sender wallet (Admin / Dev Only)
+Only needed if you fork/run your own server sender wallet.
+
+#### 1) Get Base Sepolia ETH (gas)
+Open: https://portal.cdp.coinbase.com/products/faucet  
+- Network: Base Sepolia  
+- Paste wallet address  
+- Request test ETH  
+
+#### 2) Get Base Sepolia USDC (test token)
+Open: https://faucet.circle.com/  
+- Network: Base Sepolia  
+- Token: USDC  
+- Paste wallet address  
+- Request / Mint  
 
 ---
 
 ## 🗂️ Project Structure (Simplified)
 
 app/
-├─ api/
-│ ├─ admin/
-│ ├─ me/
-│ │ └─ payroll/[id]/pdf
-│ └─ cron/
-│ └─ confirm-payroll-items
-├─ me/
-│ └─ payroll/
-│ └─ [id]
-├─ company/
+login/ # sign in
+sign-up/ # sign up
+onboarding/ # role selection + invite entry
+company/ # admin dashboard
+company-detail/ # manage employees + batches
+me/payroll/ # employee portal
+payroll-items/ # admin payroll list
+api/
+admin/ # admin-only server APIs
+me/ # employee-only server APIs
+cron/ # confirmation (optional)
 
-lib/
-└─ supabase/
-├─ browser.ts
-└─ server.ts
+lib/supabase/
+browser.ts
+server.ts
+serverRoute.ts
 
-middleware.ts
+components/
+LogoutButton.tsx
 
-
----
-
-## 🧠 Architectural Decisions
-
-- App Router default = **Server Components**
-- Client Components only for:
-  - interactivity
-  - UX state
-- No sensitive logic trusted to the browser
-- RLS treated as the **final security boundary**
-- Payroll execution and confirmation are **intentionally separated**
-- Cron logic is:
-  - idempotent
-  - retry-safe
-  - production-oriented
 
 ---
 
-## 🛣️ Roadmap
+## ✅ Roadmap / TODO
 
-### ✅ Phase 2 — Completed
-- Employee payroll portal
-- Server-only payslip PDF export
-- Strict permission boundaries
-- RLS across all core tables
-- Admin payroll mutations moved server-side
+### High Priority
+- [ ] Centralize role detection into a server-only `getUserRole()`
+- [ ] Make all admin mutations fully server-only (no client trust)
+- [ ] Add status summary (pending / paid totals)
+- [ ] Add filtering on payroll list (status filter)
 
----
-
-### ✅ Phase 3 — Completed (Confirmation Layer)
-- Blockchain transaction tracking
-- Production cron (GitHub Actions)
-- On-chain receipt confirmation
-- Automatic payroll status reconciliation
-- Retry-safe, idempotent design
-
----
-
-### 🚧 Phase 4 — Planned (Execution Layer)
-- Server-side USDC payroll execution
-- Replace manual `mark-paid` with real transactions
-- Transaction signing via secure wallet
-- Block explorer links
-- Admin audit logs
-- Role-based admin access
-- Monitoring & alerting
+### Nice to Have
+- [ ] Audit logs
+- [ ] Multi-admin per company
+- [ ] Multi-company per user
+- [ ] Mainnet-ready config separation
 
 ---
 
 ## ⚠️ Notes
-
-- This repository is an **architecture-focused MVP**
+- This repository is an MVP / learning project
 - Not production-ready
-- Designed to demonstrate:
-  - security-first backend thinking
-  - real-world permission boundaries
-  - Web3 payroll architecture patterns
-  - production cron design
+- Focused on security boundaries + correct architecture
 
 ---
 
-Built by **Changyu Huang**  
-Exploring **secure payroll systems**, **server-first design**, and **Web3 payroll infrastructure**.
+Built by **Changyu Huang**
