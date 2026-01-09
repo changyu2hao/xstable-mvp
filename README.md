@@ -333,34 +333,9 @@ XStable uses a **production-grade cron job** to automatically confirm on-chain p
 
 This ensures payroll items move from `submitted → paid / failed` **without any manual intervention**.
 
-* * *
-
 ### ✅ Production Cron (GitHub Actions)
 
 A scheduled GitHub Actions workflow runs **every 10 minutes**.
-
-# .github/workflows/confirm-payroll.yml
-name: Confirm Payroll Items
-
-on:
-  schedule:
-    - cron: "*/10 * * * *" # every 10 minutes
-  workflow_dispatch: {}
-
-jobs:
-  confirm:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Call confirm payroll cron
-        run: |
-          curl -X POST "$CRON_URL" \
-            -H "Authorization: Bearer $CRON_SECRET" \
-            -H "Content-Type: application/json"
-        env:
-          CRON_URL: ${{ secrets.CRON_URL }}
-          CRON_SECRET: ${{ secrets.CRON_SECRET }}
-## 
 
 **Key properties:**
 
@@ -375,20 +350,9 @@ jobs:
 -   No client or public access
     
 
-* * *
-
-### 🔐 Cron Authentication & Security
-
-## 
+### ✅ Cron Authentication & Security
 
 The cron endpoint is **not public**.
-
-function isAuthorized(req: Request) {
-  const token = req.headers.get("authorization");
-  return token === `Bearer ${process.env.CRON_SECRET}`;
-}
-
-## 
 
 -   Requests **must** include `Authorization: Bearer <CRON_SECRET>`
     
@@ -397,17 +361,11 @@ function isAuthorized(req: Request) {
 -   Prevents abuse or external triggering
     
 
-* * *
-
-### 🧠 On-chain Confirmation Logic
-
-## 
+### ✅ On-chain Confirmation Logic
 
 **Endpoint:**
 
 POST /api/cron/confirm-payroll-items
-
-## 
 
 -   **Responsibilities:**
     
@@ -426,27 +384,17 @@ POST /api/cron/confirm-payroll-items
         -   ❌ reverted (failed)
             
         -   ✅ confirmed (paid)
-            
-    
-    * * *
     
 
-### 🔄 Status Transitions
+### ✅ Status Transitions
 
-## 
-
--   | Blockchain Result | Database Update |
+    | Blockchain Result | Database Update |
     | --- | --- |
     | Not mined | No change (retry later) |
     | Reverted | `submitted → failed` |
-    | Successful | `submitted → paid` + `paid_at` |
-    
-    * * *
-    
+    | Successful | `submitted → paid` + `paid_at` | 
 
-### 🧱 Reliability & Fault Tolerance
-
-## 
+### ✅ Reliability & Fault Tolerance
 
 -   The cron job is designed to be **safe and resilient**:
     
@@ -465,12 +413,9 @@ POST /api/cron/confirm-payroll-items
         -   Safe to run repeatedly
             
         -   No duplicate side effects
-            
-    
-    * * *
     
 
-### 📊 Structured Logging
+### ✅ Structured Logging
 
 ## 
 
@@ -502,12 +447,9 @@ POST /api/cron/confirm-payroll-items
     
     This makes debugging and monitoring straightforward.
     
-    * * *
-    
 
-### 🏗️ Why This Matters
+### ✅ Why This Matters
 
-## 
 
 -   This cron setup ensures:
     
