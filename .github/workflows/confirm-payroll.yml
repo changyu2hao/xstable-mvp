@@ -2,8 +2,12 @@ name: Confirm Payroll Items
 
 on:
   schedule:
-    - cron: "*/10 * * * *" # 每 10 分钟
+    - cron: "3-59/10 * * * *" # 每 10 分钟
   workflow_dispatch: {}
+
+concurrency:
+  group: confirm-payroll-items
+  cancel-in-progress: true
 
 jobs:
   confirm:
